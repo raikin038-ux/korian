@@ -435,6 +435,10 @@ canvas { display: block; }
   justify-content: center;
   z-index: 100;
   transition: opacity 0.5s ease;
+  /* 中身が画面より高い場合はスクロールできるように */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 0;
 }
 .screen.hidden {
   opacity: 0;
@@ -660,12 +664,27 @@ canvas { display: block; }
   #memory-flash { top: 32%; }
   #big-banner { font-size: 20px; max-width: 86vw; }
 
-  /* タイトル/クリア/オーバー画面 */
+  /* タイトル/クリア/オーバー画面：上揃え＋スクロールで全要素に到達できるように */
+  .screen { justify-content: flex-start; padding: 56px 0 40px; }
   .title-logo { font-size: 30px; }
   .title-sub { font-size: 11px; letter-spacing: 2px; }
   #title-screen p { font-size: 12px; padding: 0 18px; margin-bottom: 24px; }
   .btn { font-size: 15px; padding: 12px 28px; }
   #quiz-choices, .stage-clear-wordlist { width: 88vw; }
+
+  /* クリア画面をコンパクトに（NEXTボタンが画面内に収まるように） */
+  #clear-screen h1, #gameover-screen h1 { font-size: 34px; margin-bottom: 6px; }
+  #clear-quiz, .stage-clear-wordlist { padding: 12px; margin-bottom: 14px; }
+  #clear-quiz h3, .stage-clear-wordlist h3 { font-size: 14px; margin-bottom: 8px; }
+  #quiz-word { font-size: 36px !important; }
+  #quiz-romaji { font-size: 14px !important; }
+  #quiz-listen-btn { font-size: 12px !important; padding: 5px 14px !important; }
+  .quiz-btn { padding: 12px !important; font-size: 14px !important; }
+  #quiz-feedback { font-size: 15px !important; }
+  .word-item { font-size: 13px; margin-bottom: 6px; }
+  /* 覚えた単語リストが長い場合は内部スクロール */
+  .stage-clear-wordlist { max-height: 22vh; overflow-y: auto; }
+  #next-sector-btn { margin-top: 6px; }
 }
 
 /* 横向き・低い画面では上部パネルをさらに小さく */
