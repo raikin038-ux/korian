@@ -1,0 +1,2604 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔫 Neon Hangeul Sniper - 翻訳狙撃TPS</title>
+<!-- Google Fonts: SF感のあるOrbitron、日本語用M PLUS 1p、韓国語用Noto Sans KR -->
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;700;900&family=Noto+Sans+KR:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --neon-blue: #00f0ff;
+  --neon-pink: #ff007f;
+  --neon-yellow: #ffee00;
+  --neon-green: #39ff14;
+  --dark-bg: #05050a;
+  --panel-bg: rgba(10, 10, 20, 0.75);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; user-select: none; }
+body {
+  background: var(--dark-bg);
+  overflow: hidden;
+  font-family: 'M PLUS 1p', 'Noto Sans KR', 'Segoe UI', sans-serif;
+  color: white;
+}
+
+canvas { display: block; }
+
+/* 画面演出オーバーレイ（ビネット＋走査線） */
+#fx-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  /* ビネット（周辺減光）＋うっすら走査線 */
+  background:
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.45) 100%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 4px);
+}
+
+/* プレミアムSF HUD */
+#hud {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 280px 1fr 280px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "player-stats mission enemy-stats"
+    ". . ."
+    "controls . weapon-status";
+}
+
+.hud-panel {
+  background: linear-gradient(135deg, rgba(12,16,30,0.82) 0%, rgba(8,10,22,0.7) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  padding: 16px;
+  box-shadow: 0 0 22px rgba(0, 240, 255, 0.12), inset 0 0 14px rgba(0, 240, 255, 0.06);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  transition: all 0.3s ease;
+  /* 右上と左下を切り欠いたサイバー風の角 */
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+/* プレイヤー情報（左上） */
+#player-panel {
+  grid-area: player-stats;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 4px solid var(--neon-blue);
+}
+.stat-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.hp-bar-container {
+  width: 100%;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+#hp-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-blue), #0088ff);
+  box-shadow: 0 0 10px var(--neon-blue);
+  transition: width 0.2s ease;
+}
+
+/* ミッション・お題（中央上） */
+#mission-panel {
+  grid-area: mission;
+  justify-self: center;
+  align-self: start;
+  text-align: center;
+  min-width: 320px;
+  border-top: 4px solid var(--neon-yellow);
+  box-shadow: 0 0 25px rgba(255, 238, 0, 0.15);
+  border-color: rgba(255, 238, 0, 0.3);
+}
+#mission-target {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 12px rgba(255, 238, 0, 0.6);
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+#mission-hint {
+  font-size: 13px;
+  color: #aaa;
+  margin-top: 6px;
+  background: rgba(255, 238, 0, 0.08);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 238, 0, 0.2);
+}
+
+/* ステージ＆敵情報（右上） */
+#enemy-panel {
+  grid-area: enemy-stats;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 4px solid var(--neon-pink);
+  border-color: rgba(255, 0, 127, 0.3);
+  text-align: right;
+}
+.stage-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px var(--neon-pink);
+}
+#score-display {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  color: #fff;
+}
+
+/* 操作説明（左下） */
+#controls-panel {
+  grid-area: controls;
+  font-size: 11px;
+  color: #88aacc;
+  line-height: 1.6;
+  border-bottom: 2px solid rgba(0, 240, 255, 0.3);
+  max-width: 220px;
+  align-self: end;
+}
+
+/* 武器ステータス/熱量（右下） */
+#weapon-panel {
+  grid-area: weapon-status;
+  align-self: end;
+  width: 220px;
+  border-right: 4px solid var(--neon-pink);
+  border-color: rgba(255, 0, 127, 0.3);
+}
+.heat-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+  border: 1px solid rgba(255, 0, 127, 0.3);
+}
+#heat-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #ff007f, #ff5500);
+  box-shadow: 0 0 8px var(--neon-pink);
+  transition: width 0.1s ease;
+}
+#overheat-warning {
+  font-size: 11px;
+  color: var(--neon-pink);
+  font-weight: bold;
+  text-align: center;
+  margin-top: 4px;
+  visibility: hidden;
+  animation: blink 0.5s infinite alternate;
+}
+
+/* マナゲージ */
+.mana-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+  border: 1px solid rgba(0, 150, 255, 0.4);
+}
+#mana-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #0066ff, #33ccff);
+  box-shadow: 0 0 8px #3399ff;
+  transition: width 0.1s ease;
+}
+
+/* QWERスキルバー（中央下） */
+#skill-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 12;
+  pointer-events: none;
+}
+.skill-slot {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  background: linear-gradient(135deg, rgba(12,16,30,0.9), rgba(8,10,22,0.8));
+  border: 2px solid rgba(0,240,255,0.5);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px rgba(0,240,255,0.2);
+  transition: all 0.15s ease;
+}
+.skill-icon { font-size: 26px; filter: drop-shadow(0 0 4px rgba(0,240,255,0.6)); }
+.skill-key {
+  position: absolute;
+  bottom: -2px; right: 3px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 4px #000;
+}
+.skill-cd {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  border-radius: 8px;
+}
+.skill-cd:empty { display: none; }
+/* クールダウン中 */
+.skill-slot.cooling { border-color: rgba(120,120,140,0.6); box-shadow: none; }
+.skill-slot.cooling .skill-icon { filter: grayscale(1) brightness(0.6); }
+/* マナ不足 */
+.skill-slot.no-mana { border-color: rgba(80,80,100,0.5); }
+.skill-slot.no-mana .skill-icon { opacity: 0.45; }
+/* ロック中 */
+.skill-slot.locked { border-color: rgba(80,80,100,0.5); }
+.skill-slot.locked .skill-icon { opacity: 0.3; }
+
+@keyframes blink {
+  from { opacity: 0.3; } to { opacity: 1; }
+}
+
+/* ③ コンボ表示 */
+#combo-display {
+  position: fixed;
+  top: 22%; right: 6%;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--neon-green);
+  text-shadow: 0 0 15px var(--neon-green);
+  pointer-events: none;
+  z-index: 14;
+  visibility: hidden;
+  text-align: center;
+}
+
+/* ③ イベント表示 */
+#event-display {
+  position: fixed;
+  top: 19%; left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  background: rgba(0,0,0,0.6);
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1px solid currentColor;
+  pointer-events: none;
+  z-index: 14;
+  visibility: hidden;
+}
+
+/* ② 記憶フラッシュ */
+#memory-flash {
+  position: fixed;
+  top: 38%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.5);
+  text-align: center;
+  pointer-events: none;
+  z-index: 16;
+  opacity: 0;
+  text-shadow: 0 0 20px rgba(57,255,20,0.5);
+}
+#memory-flash.show {
+  animation: memoryPop 1.4s ease-out forwards;
+}
+@keyframes memoryPop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  30%  { transform: translate(-50%, -50%) scale(1.0); }
+  75%  { opacity: 1; transform: translate(-50%, -60%) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(0.9); }
+}
+
+/* ③ 大バナー */
+#big-banner {
+  position: fixed;
+  top: 32%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  font-family: 'Orbitron', 'M PLUS 1p', sans-serif;
+  font-size: 30px;
+  font-weight: 900;
+  text-align: center;
+  pointer-events: none;
+  z-index: 17;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-shadow: 0 0 25px currentColor;
+}
+#big-banner.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* クロスヘア（照準器） */
+#crosshair {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 40px; height: 40px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+  animation: chSpin 8s linear infinite;
+}
+@keyframes chSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+/* 外周リング */
+#crosshair::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1.5px solid rgba(0,240,255,0.7);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(0,240,255,0.5), inset 0 0 6px rgba(0,240,255,0.3);
+  /* 上下左右だけ残して切り欠く */
+  clip-path: polygon(0 0,35% 0,35% 12%,65% 12%,65% 0,100% 0,100% 35%,88% 35%,88% 65%,100% 65%,100% 100%,65% 100%,65% 88%,35% 88%,35% 100%,0 100%,0 65%,12% 65%,12% 35%,0 35%);
+}
+/* 中心ドット */
+#crosshair::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 5px; height: 5px;
+  background: var(--neon-yellow);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px var(--neon-yellow);
+}
+.crosshair-dot { display: none; }
+
+/* 狙撃警告・通知（画面中央のオーバーレイ） */
+#alert-overlay {
+  position: fixed;
+  top: 25%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  font-size: 24px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 12px 30px;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#alert-overlay.show-correct {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  color: var(--neon-green);
+  background: rgba(57, 255, 20, 0.15);
+  border: 2px solid var(--neon-green);
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+}
+#alert-overlay.show-wrong {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  color: var(--neon-pink);
+  background: rgba(255, 0, 127, 0.15);
+  border: 2px solid var(--neon-pink);
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.3);
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  20%, 60% { transform: translate(-52%, -50%) scale(1); }
+  40%, 80% { transform: translate(-48%, -50%) scale(1); }
+}
+
+/* フルスクリーン画面（タイトル、ゲームオーバー、リザルトなど） */
+.screen {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(5, 5, 10, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: opacity 0.5s ease;
+}
+.screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.title-logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 54px;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--neon-blue) 0%, var(--neon-pink) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+.title-sub {
+  font-size: 16px;
+  color: #88aacc;
+  margin-bottom: 40px;
+  letter-spacing: 4px;
+}
+
+.btn {
+  padding: 16px 40px;
+  background: transparent;
+  border: 2px solid var(--neon-blue);
+  color: var(--neon-blue);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  outline: none;
+}
+.btn:hover {
+  background: var(--neon-blue);
+  color: var(--dark-bg);
+  box-shadow: 0 0 25px var(--neon-blue);
+  transform: scale(1.05);
+}
+
+/* ゲームオーバー画面 */
+#gameover-screen {
+  background: rgba(20, 5, 10, 0.95);
+}
+#gameover-screen h1 {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--neon-pink);
+  font-size: 64px;
+  text-shadow: 0 0 30px var(--neon-pink);
+  margin-bottom: 12px;
+}
+#gameover-stats {
+  font-size: 18px;
+  color: #aaa;
+  margin-bottom: 40px;
+  line-height: 2;
+  text-align: center;
+}
+
+/* ステージクリア・リザルト画面 */
+#clear-screen {
+  background: rgba(5, 15, 10, 0.95);
+}
+#clear-screen h1 {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--neon-green);
+  font-size: 64px;
+  text-shadow: 0 0 30px var(--neon-green);
+  margin-bottom: 12px;
+}
+.stage-clear-wordlist {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(57, 255, 20, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 450px;
+  width: 90%;
+  margin-bottom: 30px;
+  text-align: left;
+}
+.stage-clear-wordlist h3 {
+  color: var(--neon-green);
+  margin-bottom: 12px;
+  font-size: 16px;
+  border-bottom: 1px solid rgba(57, 255, 20, 0.3);
+  padding-bottom: 6px;
+}
+.word-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+.word-item .hangeul {
+  color: #fff;
+  font-weight: bold;
+}
+.word-item .meaning {
+  color: var(--neon-blue);
+}
+
+/* モバイル向けUIプレースホルダー（将来のAndroid化を想起） */
+#mobile-ui-notice {
+  position: absolute;
+  bottom: 20px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<!-- 画面全体の演出オーバーレイ（ビネット＋スキャンライン・軽量CSSのみ） -->
+<div id="fx-overlay"></div>
+
+<!-- SF HUD -->
+<div id="hud">
+  <!-- 左上: プレイヤー情報 -->
+  <div id="player-panel" class="hud-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span class="stat-label">❤️ CORE HP</span>
+      <span id="hp-value" style="font-family:'Orbitron'; font-weight:bold; color:var(--neon-blue);">100</span>
+    </div>
+    <div class="hp-bar-container">
+      <div id="hp-bar"></div>
+    </div>
+  </div>
+
+  <!-- 中央上: 翻訳狙撃ミッション -->
+  <div id="mission-panel" class="hud-panel">
+    <span class="stat-label" style="color:var(--neon-yellow);">🎯 TARGET MISSION</span>
+    <div id="mission-target">お題をロード中...</div>
+    <div id="mission-hint">ヒント表示エリア</div>
+    <button id="listen-btn" onclick="replayTargetWord()"
+      style="margin-top:6px; font-family:'Orbitron'; font-size:12px; padding:5px 14px; background:transparent; border:1px solid var(--neon-yellow); color:var(--neon-yellow); border-radius:14px; cursor:pointer;">
+      🔊 発音を聞く (R)
+    </button>
+  </div>
+
+  <!-- 右上: ステージ＆スコア＆ランク -->
+  <div id="enemy-panel" class="hud-panel">
+    <div class="stage-title">STAGE <span id="stage-num">1</span></div>
+    <div id="score-display">SCORE: <span id="score-val">0000</span></div>
+    <div style="font-size:12px; color:#aaa; margin-top:4px;">残りターゲット: <span id="remaining-targets">0</span></div>
+    <div style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+      <div id="rank-display" style="font-family:'Orbitron'; font-size:14px; font-weight:900;">🏅 ROOKIE</div>
+      <div id="rank-desc" style="font-size:10px; color:#888; margin-top:2px;"></div>
+      <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; margin-top:4px;">
+        <div id="rank-progress" style="height:100%; background:var(--neon-green); border-radius:3px; width:0%; transition:width 0.3s;"></div>
+      </div>
+      <div id="rank-next" style="font-size:10px; color:#666; margin-top:2px;"></div>
+    </div>
+  </div>
+
+  <!-- 左下: 操作ガイド -->
+  <div id="controls-panel" class="hud-panel">
+    <strong>[CONTROLS]</strong><br>
+    WASD: 移動 ／ マウス＋クリック: 射撃<br>
+    <span style="color:#00f0ff">Q: チャージショット</span><br>
+    <span style="color:#39ff14">Shift: ダッシュ(無敵)</span><br>
+    <span style="color:#ff007f">E: スロウフィールド</span><br>
+    <span style="color:#ffee00">R: FREEZE(ULT)</span> ／ L: 発音<br>
+    ※ 正解弾で暴走敵を鎮圧できる！
+  </div>
+
+  <!-- 右下: オーバーヒート＆スキルクールダウン -->
+  <div id="weapon-panel" class="hud-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+      <span class="stat-label" style="color:var(--neon-pink);">🔥 WEAPON TEMP</span>
+      <span id="heat-value" style="font-family:'Orbitron'; color:var(--neon-pink);">0%</span>
+    </div>
+    <div class="heat-bar-container">
+      <div id="heat-bar"></div>
+    </div>
+    <div id="overheat-warning">OVERHEATED (COOLING)</div>
+    <!-- マナゲージ -->
+    <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+      <span class="stat-label" style="color:#3399ff;">🔵 MANA</span>
+      <span id="mana-value" style="font-family:'Orbitron'; color:#3399ff;">100</span>
+    </div>
+    <div class="mana-bar-container"><div id="mana-bar"></div></div>
+  </div>
+
+  <!-- 中央下: QWERスキルバー -->
+  <div id="skill-bar">
+    <div class="skill-slot" id="skill-Q"><div class="skill-icon">🎯</div><div class="skill-key">Q</div><div class="skill-cd"></div></div>
+    <div class="skill-slot" id="skill-W"><div class="skill-icon">⚡</div><div class="skill-key">Shift</div><div class="skill-cd"></div></div>
+    <div class="skill-slot" id="skill-E"><div class="skill-icon">🌀</div><div class="skill-key">E</div><div class="skill-cd"></div></div>
+    <div class="skill-slot" id="skill-R"><div class="skill-icon">❄️</div><div class="skill-key">R</div><div class="skill-cd"></div></div>
+  </div>
+</div>
+
+<!-- ③ コンボ表示（中央やや上） -->
+<div id="combo-display"></div>
+
+<!-- ③ イベント表示（中央上、ミッションの下） -->
+<div id="event-display"></div>
+
+<!-- ② 記憶フラッシュ（撃破時に単語を大きく表示） -->
+<div id="memory-flash"></div>
+
+<!-- ③ 大バナー（イベント開始・復習ボスなど） -->
+<div id="big-banner"></div>
+
+<!-- 照準器 -->
+<div id="crosshair">
+  <div class="crosshair-dot"></div>
+</div>
+
+<!-- 画面中央通知 -->
+<div id="alert-overlay">TARGET HIT!</div>
+
+<!-- タイトル画面 -->
+<div id="title-screen" class="screen">
+  <h1 class="title-logo">NEON HANGEUL SNIPER</h1>
+  <div class="title-sub">TRANSLATION TARGETING TPS</div>
+  <p style="max-width: 500px; text-align: center; color: #aaa; margin-bottom: 40px; font-size: 14px; line-height: 1.6;">
+    サイバー空間に侵入した語学バグを排除せよ！<br>
+    画面中央のお題に一致するハングルを掲げた敵を狙撃してください。<br>
+    ターゲット以外を撃つと凶暴化して突進してきます。<br>
+    <span style="color:#3399ff;">マナを溜めて Q/Shift/E/R のスキルを駆使しろ！</span>
+  </p>
+  <button class="btn" onclick="startGame()">START MISSION</button>
+  <div id="mobile-ui-notice">Android移植時はバーチャルスティック＆タップ射撃に対応予定</div>
+</div>
+
+<!-- ゲームオーバー画面 -->
+<div id="gameover-screen" class="screen hidden">
+  <h1>MISSION FAILED</h1>
+  <div id="gameover-stats">
+    到達ステージ: <span id="go-stage">1</span><br>
+    最終スコア: <span id="go-score">0</span>
+  </div>
+  <button class="btn" style="border-color:var(--neon-pink); color:var(--neon-pink);" onclick="restartGame()">RETRY SYSTEM</button>
+</div>
+
+<!-- ステージクリア/リザルト画面 -->
+<div id="clear-screen" class="screen hidden">
+  <h1>STAGE CLEARED</h1>
+  <div class="title-sub" style="color:var(--neon-green); margin-bottom: 20px;">SYSTEM PURIFIED</div>
+
+  <!-- 覚えた単語から1問テスト -->
+  <div id="clear-quiz" class="stage-clear-wordlist" style="display:none;">
+    <h3>📝 復習テスト: この単語の意味は？</h3>
+    <div style="text-align:center; margin:10px 0;">
+      <div id="quiz-word" style="font-size:46px; color:var(--neon-yellow); font-weight:900;"></div>
+      <div id="quiz-romaji" style="font-size:16px; color:var(--neon-blue);"></div>
+      <button id="quiz-listen-btn" class="btn" style="font-size:13px; padding:6px 18px; margin-top:8px;" onclick="replayQuizWord()">🔊 発音を聞く</button>
+    </div>
+    <div id="quiz-choices" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;"></div>
+    <div id="quiz-feedback" style="text-align:center; margin-top:12px; font-size:18px; min-height:24px;"></div>
+  </div>
+
+  <div class="stage-clear-wordlist">
+    <h3>📖 このステージで覚えた単語</h3>
+    <div id="learned-words-container">
+      <!-- JavaScriptで動的生成 -->
+    </div>
+  </div>
+
+  <button id="next-sector-btn" class="btn" style="border-color:var(--neon-green); color:var(--neon-green);" onclick="nextStage()">NEXT SECTOR ▶</button>
+</div>
+
+<!-- Three.js (r134) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+<script>
+'use strict';
+
+// ============================================================
+// 韓国語学習データ (ネオン・スナイパー用)
+// ============================================================
+const koreanData = [
+  { word:'안녕', romaji:'annyeong', meaning:'こんにちは', hint:'日常的な挨拶の言葉',
+    sentence:'안녕! 잘 지냈어?', sentenceMeaning:'こんにちは！元気だった？',
+    dialogue:'A: 안녕하세요!\nB: 네, 안녕하세요!', dialogueMeaning:'A: こんにちは！\nB: はい、こんにちは！' },
+  { word:'감사', romaji:'gamsa',    meaning:'ありがとう', hint:'感謝を表す言葉',
+    sentence:'감사합니다!', sentenceMeaning:'ありがとうございます！',
+    dialogue:'A: 도와줘서 감사해요.\nB: 천만에요.', dialogueMeaning:'A: 助けてくれてありがとう。\nB: どういたしまして。' },
+  { word:'친구', romaji:'chingu',   meaning:'友達',       hint:'仲良しの人のこと',
+    sentence:'친구가 있어요.', sentenceMeaning:'友達がいます。',
+    dialogue:'A: 친구 있어?\nB: 응, 많아!', dialogueMeaning:'A: 友達いる？\nB: うん、たくさん！' },
+  { word:'물',   romaji:'mul',      meaning:'水',         hint:'のどが渇いたときに飲む液体',
+    sentence:'물 주세요.', sentenceMeaning:'水をください。',
+    dialogue:'A: 뭐 마실래?\nB: 물 주세요.', dialogueMeaning:'A: 何飲む？\nB: 水をください。' },
+  { word:'밥',   romaji:'bap',      meaning:'ごはん',     hint:'韓国の主食、食事のこと',
+    sentence:'밥 먹었어요?', sentenceMeaning:'ごはん食べましたか？',
+    dialogue:'A: 밥 먹었어?\nB: 아직이요!', dialogueMeaning:'A: ごはん食べた？\nB: まだです！' },
+  { word:'사랑', romaji:'sarang',   meaning:'愛',         hint:'ハートマーク、大好きな気持ち',
+    sentence:'사랑해요!', sentenceMeaning:'愛しています！',
+    dialogue:'A: 사랑해!\nB: 나도 사랑해!', dialogueMeaning:'A: 愛してる！\nB: 私も愛してる！' },
+  { word:'학교', romaji:'hakgyo',   meaning:'学校',       hint:'勉強をする場所',
+    sentence:'학교에 가요.', sentenceMeaning:'学校に行きます。',
+    dialogue:'A: 어디 가요?\nB: 학교에 가요.', dialogueMeaning:'A: どこ行くの？\nB: 学校に行きます。' },
+  { word:'집',   romaji:'jip',      meaning:'家',         hint:'自分が住んでいる場所',
+    sentence:'집에 있어요.', sentenceMeaning:'家にいます。',
+    dialogue:'A: 지금 어디야?\nB: 집이야.', dialogueMeaning:'A: 今どこ？\nB: 家だよ。' },
+  { word:'고양이',romaji:'goyangi', meaning:'猫',         hint:'ニャーと鳴くかわいい動物',
+    sentence:'고양이가 귀여워요.', sentenceMeaning:'猫がかわいいです。',
+    dialogue:'A: 어떤 동물 좋아해?\nB: 고양이요!', dialogueMeaning:'A: どの動物が好き？\nB: 猫です！' },
+  { word:'개',   romaji:'gae',      meaning:'犬',         hint:'ワンと鳴く人懐っこい動物',
+    sentence:'개가 달려요.', sentenceMeaning:'犬が走っています。',
+    dialogue:'A: 개 있어?\nB: 응, 우리 개야!', dialogueMeaning:'A: 犬いる？\nB: うん、うちの犬だよ！' },
+  { word:'커피', romaji:'keopi',    meaning:'コーヒー',   hint:'カフェインの入った茶色い飲み物',
+    sentence:'커피 한 잔 주세요.', sentenceMeaning:'コーヒーを一杯ください。',
+    dialogue:'A: 뭐 마실래요?\nB: 커피 주세요.', dialogueMeaning:'A: 何を飲みますか？\nB: コーヒーをください。' },
+  { word:'우유', romaji:'uyu',      meaning:'牛乳',       hint:'牛からとれる白い飲み物',
+    sentence:'우유를 마셔요.', sentenceMeaning:'牛乳を飲みます。',
+    dialogue:'A: 아침에 뭐 마셔?\nB: 우유 마셔.', dialogueMeaning:'A: 朝何飲む？\nB: 牛乳飲むよ。' },
+];
+
+// ランク定義
+const RANKS = [
+  { name:'ROOKIE',   minScore:0,    color:'#88aacc', desc:'意味から単語を探せ' },
+  { name:'SOLDIER',  minScore:500,  color:'#39ff14', desc:'ローマ字から単語を探せ' },
+  { name:'EXPERT',   minScore:1500, color:'#ffee00', desc:'短文の中のキーワードを探せ' },
+  { name:'MASTER',   minScore:3000, color:'#ff007f', desc:'会話文を理解して探せ' },
+];
+
+function getCurrentRank() {
+  for (let i = RANKS.length - 1; i >= 0; i--) {
+    if (score >= RANKS[i].minScore) return RANKS[i];
+  }
+  return RANKS[0];
+}
+
+// ============================================================
+// グローバルゲーム状態
+// ============================================================
+let gameState = 'title'; // title | playing | gameover | clear
+let score = 0;
+let currentStage = 1;
+let activeEnemies = [];
+let currentTargetWord = null;
+let stageWords = [];
+let completedStageWords = [];
+
+// --- W: ダッシュ ---
+let dashCooldown = 0;
+let dashTimer = 0;
+const DASH_DURATION = 0.7;
+const DASH_COOLDOWN = 5.0;
+const DASH_SPEED_MULT = 3.5;
+
+// --- E: スロウフィールド（旧SOS） ---
+let sosCooldown = 0;
+const SOS_COOLDOWN = 15.0;
+
+// ============================================================
+// LoL風 マナ＆QWERスキルシステム
+// ============================================================
+let mana = 100, maxMana = 100;
+const MANA_REGEN = 14; // 毎秒回復
+
+// スキル定義（cost=マナ消費, cd=クールダウン秒）
+const SKILLS = {
+  Q: { key:'Q',     name:'チャージショット', cost:25, cd:1.2,  color:'#00f0ff', icon:'🎯' },
+  W: { key:'Shift', name:'ダッシュ',         cost:20, cd:5.0,  color:'#39ff14', icon:'⚡' },
+  E: { key:'E',     name:'スロウフィールド', cost:35, cd:8.0,  color:'#ff007f', icon:'🌀' },
+  R: { key:'R',     name:'FREEZE (ULT)',     cost:80, cd:25.0, color:'#ffee00', icon:'❄️', minStage:2 },
+};
+const skillCd = { Q:0, W:0, E:0, R:0 }; // 残りクールダウン
+
+// E: スロウフィールドの効果状態
+let slowFieldTimer = 0;
+const SLOW_DURATION = 4.0;
+const SLOW_MULT = 0.35; // 敵速度の倍率
+let slowFieldMesh = null;
+
+// R: フリーズ状態
+let freezeTimer = 0;
+const FREEZE_DURATION = 3.0;
+
+// Q: チャージショット（次の発射を強化）
+let chargedShot = false;
+
+// --- 打開策: HPドロップアイテム ---
+const hpDrops = [];
+const hpDropGeo = new THREE.SphereGeometry(0.3, 8, 8);
+const hpDropMat = new THREE.MeshBasicMaterial({ color: 0x44ff44 });
+let keys = {};
+
+// ============================================================
+// ① 習熟度管理 (localStorage SRS)
+// ============================================================
+const MASTERY_KEY = 'korean_tps_mastery';
+let mastery = {}; // { word: { correct, wrong, lastSeen } }
+
+function loadMastery() {
+  try {
+    mastery = JSON.parse(localStorage.getItem(MASTERY_KEY)) || {};
+  } catch (e) { mastery = {}; }
+}
+function saveMastery() {
+  try { localStorage.setItem(MASTERY_KEY, JSON.stringify(mastery)); } catch (e) {}
+}
+function recordResult(word, isCorrect) {
+  if (!mastery[word]) mastery[word] = { correct: 0, wrong: 0, lastSeen: 0 };
+  if (isCorrect) mastery[word].correct++;
+  else mastery[word].wrong++;
+  mastery[word].lastSeen = Date.now();
+  saveMastery();
+}
+// 習得済み（1回以上正解した）単語リストを取得
+function getLearnedWords() {
+  return koreanData.filter(d => mastery[d.word] && mastery[d.word].correct > 0);
+}
+// 苦手度スコア (高いほど復習で出やすい)
+function getWeakness(word) {
+  const m = mastery[word];
+  if (!m) return 0;
+  return m.wrong * 2 + 1 / (m.correct + 1);
+}
+loadMastery();
+
+// ============================================================
+// ③ コンボシステム
+// ============================================================
+let combo = 0;
+let comboTimer = 0;
+const COMBO_TIMEOUT = 6.0; // 秒。この時間内に次の正解でコンボ継続
+function getComboMultiplier() {
+  if (combo >= 10) return 4;
+  if (combo >= 6) return 3;
+  if (combo >= 3) return 2;
+  return 1;
+}
+
+// ============================================================
+// ③ ランダムイベント
+// ============================================================
+let activeEvent = null; // null | 'timeattack' | 'bonus'
+let eventTimer = 0;
+let bonusWord = null;
+
+// ============================================================
+// ① 復習ボス戦
+// ============================================================
+let isBossStage = false;
+const REVIEW_INTERVAL = 3; // 何ステージごとに復習ボス
+
+// 武器オーバーヒート制御
+let weaponHeat = 0;
+let overheated = false;
+const MAX_HEAT = 100;
+const HEAT_PER_SHOT = 22;
+const COOL_DOWN_SPEED = 60; // 1秒あたりに冷める量
+const OVERHEAT_COOL_DOWN_SPEED = 40; // オーバーヒート時の冷却速度
+
+// ============================================================
+// Three.js 初期化
+// ============================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101626);
+scene.fog = new THREE.FogExp2(0x101626, 0.008);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 100);
+// 見下ろし型のTPSカメラアングル
+camera.position.set(0, 10, 13);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+// ライティング（全体を明るめに）
+const ambientLight = new THREE.AmbientLight(0x6677aa, 1.1);
+scene.add(ambientLight);
+
+// 空と地面で色を分けるヘミスフィアライト（立体感＋明るさ）
+const hemiLight = new THREE.HemisphereLight(0x99bbff, 0x223355, 1.0);
+scene.add(hemiLight);
+
+// メインのディレクショナルライト（白色で明るく）
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.3);
+dirLight.position.set(10, 25, 12);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 60;
+dirLight.shadow.camera.left = -30;
+dirLight.shadow.camera.right = 30;
+dirLight.shadow.camera.top = 30;
+dirLight.shadow.camera.bottom = -30;
+scene.add(dirLight);
+
+// ネオン感のあるポイントライト
+const neonLightRed = new THREE.PointLight(0xff007f, 2, 30);
+neonLightRed.position.set(-15, 3, -15);
+scene.add(neonLightRed);
+
+const neonLightBlue = new THREE.PointLight(0x00f0ff, 2, 30);
+neonLightBlue.position.set(15, 3, 15);
+scene.add(neonLightBlue);
+
+// ============================================================
+// ステージ構築 (グリッド・障害物)
+// ============================================================
+// 地面
+const groundGeo = new THREE.PlaneGeometry(50, 50);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x2a3550,
+  roughness: 0.85,
+  metalness: 0.15
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// サイバーグリッド（明るめのライン）
+const gridHelper = new THREE.GridHelper(50, 25, 0x44ddff, 0x2a4a6a);
+gridHelper.position.y = 0.01;
+scene.add(gridHelper);
+
+// 外壁の作成
+function createNeonWall(x, y, z, w, h, d, color = 0x00f0ff) {
+  const group = new THREE.Group();
+  
+  // 壁本体
+  const wallMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: 0x05050f, roughness: 0.5 })
+  );
+  wallMesh.position.set(x, y, z);
+  wallMesh.receiveShadow = true;
+  wallMesh.castShadow = true;
+  group.add(wallMesh);
+
+  // ネオンライン
+  const glowGeo = new THREE.BoxGeometry(w + 0.1, 0.1, d + 0.1);
+  const glowMat = new THREE.MeshBasicMaterial({ color: color });
+  const glowTop = new THREE.Mesh(glowGeo, glowMat);
+  glowTop.position.set(x, y + h/2 + 0.05, z);
+  group.add(glowTop);
+
+  scene.add(group);
+  return wallMesh;
+}
+
+// 四方の外壁
+const walls = [
+  createNeonWall(0, 1.5, -25, 50, 3, 1, 0xff007f), // 奥
+  createNeonWall(0, 1.5, 25, 50, 3, 1, 0xff007f),  // 手前
+  createNeonWall(-25, 1.5, 0, 1, 3, 50, 0x00f0ff), // 左
+  createNeonWall(25, 1.5, 0, 1, 3, 50, 0x00f0ff)   // 右
+];
+
+// 障害物 (カバーポイント)
+const covers = [];
+const coverData = [
+  {x: -8, z: -8, w: 3, h: 2, d: 3},
+  {x: 8, z: -8, w: 3, h: 2, d: 3},
+  {x: -12, z: 6, w: 4, h: 2, d: 2},
+  {x: 12, z: 6, w: 4, h: 2, d: 2},
+  {x: 0, z: -15, w: 6, h: 2, d: 2},
+  {x: 0, z: 0, w: 4, h: 2, d: 4}
+];
+
+coverData.forEach(data => {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(data.w, data.h, data.d),
+    new THREE.MeshStandardMaterial({ color: 0x2e3d5c, roughness: 0.5, metalness: 0.3 })
+  );
+  mesh.position.set(data.x, data.h/2, data.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  // AABB（箱）当たり判定用の半径を保存。+0.5 はキャラの体の太さ分のマージン
+  mesh.userData.hw = data.w / 2 + 0.5; // half-width (X)
+  mesh.userData.hd = data.d / 2 + 0.5; // half-depth (Z)
+  covers.push(mesh);
+
+  // 障害物の頭上にネオンの枠線
+  const lineGeo = new THREE.BoxGeometry(data.w + 0.05, 0.08, data.d + 0.05);
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const line = new THREE.Mesh(lineGeo, lineMat);
+  line.position.set(data.x, data.h + 0.04, data.z);
+  scene.add(line);
+});
+
+// AABB押し戻し: pos(THREE.Vector3) を障害物の外へ押し出す。戻り値=押し戻したか
+function resolveCoverCollision(pos) {
+  let pushed = false;
+  for (const c of covers) {
+    const hw = c.userData.hw, hd = c.userData.hd;
+    const dx = pos.x - c.position.x;
+    const dz = pos.z - c.position.z;
+    // 箱の内側に入っているか
+    if (Math.abs(dx) < hw && Math.abs(dz) < hd) {
+      // X方向とZ方向で、外に出すのに必要な距離が小さい方へ押し出す
+      const overlapX = hw - Math.abs(dx);
+      const overlapZ = hd - Math.abs(dz);
+      if (overlapX < overlapZ) {
+        pos.x += (dx >= 0 ? overlapX : -overlapX);
+      } else {
+        pos.z += (dz >= 0 ? overlapZ : -overlapZ);
+      }
+      pushed = true;
+    }
+  }
+  return pushed;
+}
+
+// ============================================================
+// プレイヤー設計
+// ============================================================
+const playerGroup = new THREE.Group();
+playerGroup.position.set(0, 0, 18); // 手前からスタート
+scene.add(playerGroup);
+
+// 足元のリングマーカー（プレイヤー位置を見やすく）
+const playerRing = new THREE.Mesh(
+  new THREE.RingGeometry(0.7, 0.95, 24),
+  new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
+);
+playerRing.rotation.x = -Math.PI / 2;
+playerRing.position.y = 0.05;
+playerGroup.add(playerRing);
+
+// 共有マテリアル（負荷軽減のため使い回す）
+const matArmorLight = new THREE.MeshStandardMaterial({ color: 0x3aa0e8, roughness: 0.3, metalness: 0.7, emissive: 0x0a3a66, emissiveIntensity: 0.5 });
+const matArmorDark  = new THREE.MeshStandardMaterial({ color: 0x16344f, roughness: 0.4, metalness: 0.7 });
+const matJoint      = new THREE.MeshStandardMaterial({ color: 0x0c1a28, roughness: 0.6, metalness: 0.5 });
+const matGunMetal   = new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.3, metalness: 0.95 });
+const matNeon       = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+
+// 胸部コア（胴体・少しテーパーした台形シルエット）
+const playerBody = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.42, 0.34, 1.05, 6),
+  matArmorLight
+);
+playerBody.position.y = 0.95;
+playerBody.castShadow = true;
+playerGroup.add(playerBody);
+
+// 胸の発光コア
+const playerCore = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), matNeon);
+playerCore.position.set(0, 1.05, -0.32);
+playerGroup.add(playerCore);
+
+// 腰
+const playerHip = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.45), matArmorDark);
+playerHip.position.y = 0.42;
+playerHip.castShadow = true;
+playerGroup.add(playerHip);
+
+// 肩アーマー（左右）
+[-0.5, 0.5].forEach(sx => {
+  const sh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), matArmorLight);
+  sh.position.set(sx, 1.42, 0);
+  sh.scale.set(1, 0.8, 1);
+  sh.castShadow = true;
+  playerGroup.add(sh);
+});
+
+// 脚（左右）
+[-0.22, 0.22].forEach(lx => {
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.85, 6), matArmorDark);
+  leg.position.set(lx, 0.0, 0);
+  leg.castShadow = true;
+  playerGroup.add(leg);
+  const foot = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.12, 0.4), matJoint);
+  foot.position.set(lx, -0.38, 0.05);
+  playerGroup.add(foot);
+});
+
+// プレイヤー頭（バイザー付きヘルメット）
+const playerHead = new THREE.Mesh(
+  new THREE.SphereGeometry(0.32, 12, 12),
+  matArmorLight
+);
+playerHead.position.set(0, 1.72, 0);
+playerHead.scale.set(1, 1.05, 1);
+playerHead.castShadow = true;
+playerGroup.add(playerHead);
+
+// バイザー（青く光る帯）
+const playerVisor = new THREE.Mesh(
+  new THREE.BoxGeometry(0.42, 0.12, 0.2),
+  matNeon
+);
+playerVisor.position.set(0, 1.74, -0.26);
+playerGroup.add(playerVisor);
+
+// アンテナ
+const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4), matGunMetal);
+antenna.position.set(0.18, 2.05, 0);
+playerGroup.add(antenna);
+const antennaTip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff3366 }));
+antennaTip.position.set(0.18, 2.22, 0);
+playerGroup.add(antennaTip);
+
+// 右腕（銃を構える）
+const playerArm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.6, 6), matArmorDark);
+playerArm.position.set(0.5, 1.05, -0.3);
+playerArm.rotation.x = Math.PI / 2.2;
+playerGroup.add(playerArm);
+
+// プレイヤー銃（ライフル風・複数パーツ）
+const playerGun = new THREE.Group();
+const gunBarrel = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.9), matGunMetal);
+gunBarrel.position.z = -0.2;
+playerGun.add(gunBarrel);
+const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.26, 0.4), matArmorDark);
+gunBody.position.z = 0.18;
+playerGun.add(gunBody);
+const gunTip = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.12, 8), matNeon);
+gunTip.rotation.x = Math.PI / 2;
+gunTip.position.z = -0.68;
+playerGun.add(gunTip);
+playerGun.position.set(0.55, 0.95, -0.35);
+playerGroup.add(playerGun);
+
+// マズルフラッシュ用の光源
+const muzzleLight = new THREE.PointLight(0x00f0ff, 0, 8);
+muzzleLight.position.set(0.55, 0.95, -1.1);
+playerGroup.add(muzzleLight);
+
+// プレイヤーの底光り
+const playerUnderLight = new THREE.PointLight(0x00f0ff, 1.5, 5);
+playerUnderLight.position.set(0, 0.1, 0);
+playerGroup.add(playerUnderLight);
+
+const player = {
+  mesh: playerGroup,
+  hp: 100,
+  maxHp: 100,
+  speed: 7.5,
+  angle: 0,
+  invincibleTimer: 0
+};
+
+// ============================================================
+// 敵頭上の 3D ハングルテキスト作成機能
+// ============================================================
+function createHangeulSprite(text, isAngry = false) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+
+  const mainColor = isAngry ? '#ff0055' : '#00f0ff';
+  const shadowColor = isAngry ? 'rgba(255, 0, 85, 0.8)' : 'rgba(0, 240, 255, 0.8)';
+
+  // 背景を透明に
+  ctx.clearRect(0, 0, 256, 128);
+
+  // ネオングロー効果
+  ctx.shadowColor = shadowColor;
+  ctx.shadowBlur = 12;
+  
+  // テキスト塗りつぶし
+  ctx.font = 'bold 58px "Noto Sans KR", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 64);
+
+  // テキストのアウトライン（ネオンの枠線風）
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = mainColor;
+  ctx.strokeText(text, 128, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(3.2, 1.6, 1);
+  return sprite;
+}
+
+// ============================================================
+// 敵オブジェクトの設計
+// ============================================================
+const enemies = [];
+const enemyGeo = new THREE.BoxGeometry(1.1, 1.4, 1.1);
+
+// 敵タイプ定義（行動パターンで単調さを解消）
+const ENEMY_TYPES = {
+  chaser:  { label:'追跡',   color:0x4a1020, baseColor:0x2a0815, hpMul:1.0, speedMul:1.0, scale:1.0,  behavior:'chase'   },
+  speeder: { label:'高速',   color:0x6a3000, baseColor:0x3a1a00, hpMul:0.6, speedMul:1.8, scale:0.8,  behavior:'zigzag'  },
+  tank:    { label:'重装',   color:0x301050, baseColor:0x1a0830, hpMul:2.5, speedMul:0.55, scale:1.4, behavior:'chase'   },
+  shooter: { label:'射撃',   color:0x004a4a, baseColor:0x002a2a, hpMul:0.8, speedMul:0.7, scale:0.95, behavior:'shooter' },
+};
+
+// ステージごとの敵タイプ出現比率（重み）。数字が大きいほど出やすい。0で出現しない。
+// ここを編集するだけでステージの「方より」を自由に調整できる。
+const STAGE_TYPE_WEIGHTS = {
+  1: { chaser:10, speeder:0,  tank:0,  shooter:0  }, // 入門：追跡のみ
+  2: { chaser:7,  speeder:3,  tank:0,  shooter:0  }, // 高速が混じり始める
+  3: { chaser:5,  speeder:3,  tank:3,  shooter:0  }, // 重装登場
+  4: { chaser:4,  speeder:3,  tank:1,  shooter:3  }, // 射撃登場
+  5: { chaser:3,  speeder:4,  tank:2,  shooter:3  }, // 高速寄り
+  6: { chaser:2,  speeder:2,  tank:4,  shooter:3  }, // 重装寄り
+  7: { chaser:2,  speeder:3,  tank:2,  shooter:5  }, // 射撃寄り（弾幕気味）
+};
+// 上記に無いステージ（8以降）はこれを使用（全タイプまんべんなく）
+const DEFAULT_TYPE_WEIGHTS = { chaser:3, speeder:3, tank:3, shooter:3 };
+// 復習ボスステージ専用の重み
+const BOSS_TYPE_WEIGHTS = { chaser:2, speeder:3, tank:3, shooter:3 };
+
+// 重みテーブルから1タイプをランダムに選ぶ
+function pickWeightedType(weights) {
+  let total = 0;
+  for (const k in weights) total += weights[k];
+  if (total <= 0) return 'chaser';
+  let r = Math.random() * total;
+  for (const k in weights) {
+    r -= weights[k];
+    if (r < 0) return k;
+  }
+  return 'chaser';
+}
+
+// 敵の弾（shooterタイプが撃つ）
+const enemyBullets = [];
+const enemyBulletGeo = new THREE.SphereGeometry(0.18, 8, 8);
+const enemyBulletMat = new THREE.MeshBasicMaterial({ color: 0xff3366 });
+
+function spawnEnemy(wordData, x, z, typeKey) {
+  typeKey = typeKey || 'chaser';
+  const type = ENEMY_TYPES[typeKey];
+
+  const enemyGroup = new THREE.Group();
+  enemyGroup.position.set(x, 0, z);
+  enemyGroup.scale.setScalar(type.scale);
+  scene.add(enemyGroup);
+
+  // 敵のボディ（タイプごとに色を変える）
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: type.baseColor,
+    roughness: 0.4,
+    metalness: 0.5,
+    emissive: type.color,
+    emissiveIntensity: 0.45
+  });
+  const body = new THREE.Mesh(enemyGeo, bodyMat);
+  body.position.y = 0.7;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  enemyGroup.add(body);
+
+  // タイプ別の装飾パーツ（見た目で識別しやすく）
+  const accentMat = new THREE.MeshBasicMaterial({ color: type.color });
+  if (typeKey === 'chaser') {
+    // 追跡型: 頭に一本角
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 6), accentMat);
+    horn.position.set(0, 1.6, 0);
+    enemyGroup.add(horn);
+  } else if (typeKey === 'speeder') {
+    // 高速型: 背中にスラスター羽
+    [-0.4, 0.4].forEach(fx => {
+      const fin = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 4), accentMat);
+      fin.position.set(fx, 1.0, 0.4);
+      fin.rotation.x = -0.5;
+      enemyGroup.add(fin);
+    });
+  } else if (typeKey === 'tank') {
+    // 重装型: 肩アーマー＋頭頂プレート
+    [-0.6, 0.6].forEach(sx => {
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.7), bodyMat);
+      pad.position.set(sx, 1.0, 0);
+      pad.castShadow = true;
+      enemyGroup.add(pad);
+    });
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 1.2), accentMat);
+    crown.position.set(0, 1.5, 0);
+    enemyGroup.add(crown);
+  } else if (typeKey === 'shooter') {
+    // 射撃型: 砲身を装備
+    const cannon = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.8, 8), matGunMetal);
+    cannon.rotation.x = Math.PI / 2;
+    cannon.position.set(0.4, 0.9, -0.5);
+    enemyGroup.add(cannon);
+    const cannonTip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), accentMat);
+    cannonTip.position.set(0.4, 0.9, -0.9);
+    enemyGroup.add(cannonTip);
+  }
+
+  // 敵の目 (光る・タイプ色)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2255 });
+  const eyeLeft = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.05), eyeMat);
+  eyeLeft.position.set(-0.25, 1.1, -0.56);
+  const eyeRight = eyeLeft.clone();
+  eyeRight.position.x = 0.25;
+  enemyGroup.add(eyeLeft);
+  enemyGroup.add(eyeRight);
+
+  // ハングル表示スプライト
+  const textSprite = createHangeulSprite(wordData.word, false);
+  textSprite.position.set(0, 2.2, 0);
+  enemyGroup.add(textSprite);
+
+  // 3D HPバー背景
+  const hpBg = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 0.15),
+    new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.DoubleSide })
+  );
+  hpBg.position.set(0, 1.7, 0);
+  enemyGroup.add(hpBg);
+
+  // 3D HPバー
+  const hpFill = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 0.11),
+    new THREE.MeshBasicMaterial({ color: 0xff0055, side: THREE.DoubleSide })
+  );
+  hpFill.position.set(0, 1.7, 0.01);
+  enemyGroup.add(hpFill);
+
+  const baseHp = (40 + currentStage * 5) * type.hpMul;
+  const baseSpd = (2.0 + currentStage * 0.2) * type.speedMul;
+
+  const enemyObj = {
+    group: enemyGroup,
+    body: body,
+    bodyMaterial: bodyMat,
+    textSprite: textSprite,
+    hpBg: hpBg,
+    hpFill: hpFill,
+    eyeLeft: eyeLeft,
+    eyeRight: eyeRight,
+
+    data: wordData,
+    typeKey: typeKey,
+    type: type,
+    behavior: type.behavior,
+    hp: baseHp,
+    maxHp: baseHp,
+    speed: baseSpd,
+    baseSpeed: baseSpd,
+
+    isAngry: false, // 間違えて狙撃されると怒り狂う
+    isBonus: false, // ボーナスターゲット
+    flashTimer: 0,
+    dead: false,
+    shootCooldown: 1.5 + Math.random() * 1.5, // shooter用
+    zigzagPhase: Math.random() * Math.PI * 2,  // speeder用
+
+    // アニメーション用
+    animOffset: Math.random() * Math.PI * 2
+  };
+
+  enemies.push(enemyObj);
+  activeEnemies.push(enemyObj);
+}
+
+// ステージ開始時の敵生成
+function startStage(stage) {
+  // 古い敵の消去
+  activeEnemies.forEach(e => scene.remove(e.group));
+  enemies.length = 0;
+  activeEnemies.length = 0;
+  completedStageWords = [];
+
+  // コンボ・イベント・敵弾をリセット
+  resetCombo();
+  clearEvent();
+  clearEnemyBullets();
+
+  // スキル効果をリセット
+  slowFieldTimer = 0;
+  freezeTimer = 0;
+  if (slowFieldMesh) { scene.remove(slowFieldMesh); slowFieldMesh = null; }
+
+  // 復習ボス判定: REVIEW_INTERVALごと、かつ習得単語が4つ以上あるとき
+  const learned = getLearnedWords();
+  isBossStage = (stage % REVIEW_INTERVAL === 0) && learned.length >= 4;
+
+  let pool, enemyCount;
+  if (isBossStage) {
+    // 復習ステージ: 習得済み単語から、苦手なものを優先して出題
+    const sorted = [...learned].sort((a, b) => getWeakness(b.word) - getWeakness(a.word));
+    enemyCount = Math.min(5, sorted.length);
+    stageWords = sorted.slice(0, enemyCount).sort(() => Math.random() - 0.5);
+    showBanner('📚 REVIEW BOSS — 覚えた単語の総復習！', '#ffee00');
+  } else {
+    // 通常ステージ
+    enemyCount = Math.min(3 + Math.floor(stage / 2), 6);
+    const shuffled = [...koreanData].sort(() => Math.random() - 0.5);
+    stageWords = shuffled.slice(0, enemyCount);
+  }
+
+  // スポーン座標（プレイヤーを囲むように全方位へ散らす。初期位置(0,18)付近は避ける）
+  const spawnPoints = [
+    {x: -18, z: -18}, {x: 18, z: -18}, {x: 0, z: -20},   // 奥
+    {x: -21, z: 0},   {x: 21, z: 0},                      // 左右
+    {x: -18, z: 14},  {x: 18, z: 14},                     // 手前左右
+    {x: -10, z: -8},  {x: 10, z: -8},                     // 中間
+  ].sort(() => Math.random() - 0.5);
+
+  // ステージごとの重みテーブルを選択（STAGE_TYPE_WEIGHTSを編集すれば方よりを調整可能）
+  const weights = isBossStage
+    ? BOSS_TYPE_WEIGHTS
+    : (STAGE_TYPE_WEIGHTS[stage] || DEFAULT_TYPE_WEIGHTS);
+
+  for (let i = 0; i < enemyCount; i++) {
+    const t = pickWeightedType(weights);
+    spawnEnemy(stageWords[i], spawnPoints[i].x, spawnPoints[i].z, t);
+  }
+
+  selectNextTarget();
+  updateHUD();
+}
+
+// 次のターゲット単語を選出 (ランクに応じて出題形式を変える)
+function selectNextTarget() {
+  const remaining = stageWords.filter(w => !completedStageWords.includes(w));
+  if (remaining.length > 0) {
+    currentTargetWord = remaining[Math.floor(Math.random() * remaining.length)];
+    const rank = getCurrentRank();
+
+    let missionText = '';
+    let hintText = '';
+
+    // 復習ボスステージ: テスト形式（意味だけ出してヒントは伏せる）
+    if (isBossStage) {
+      missionText = `「 ${currentTargetWord.meaning} 」`;
+      hintText = `📝 TEST: ヒントなしで思い出せ！(${currentTargetWord.romaji.charAt(0)}…)`;
+      document.getElementById('mission-target').textContent = missionText;
+      document.getElementById('mission-hint').textContent = hintText;
+      speakHangeul(currentTargetWord.word); // ターゲットの発音を読み上げ
+      updateHUD();
+      return;
+    }
+
+    if (rank.name === 'ROOKIE') {
+      // ランク1: 意味から単語を探す
+      missionText = `「 ${currentTargetWord.meaning} 」`;
+      hintText = `💡 ${currentTargetWord.hint}`;
+    } else if (rank.name === 'SOLDIER') {
+      // ランク2: ローマ字読みから探す
+      missionText = `「 ${currentTargetWord.romaji} 」`;
+      hintText = `💡 意味: ${currentTargetWord.meaning} ／ ${currentTargetWord.hint}`;
+    } else if (rank.name === 'EXPERT') {
+      // ランク3: 短文の中のキーワード
+      missionText = currentTargetWord.sentence;
+      hintText = `💡 「${currentTargetWord.sentenceMeaning}」の中のキーワードを撃て！`;
+    } else {
+      // ランク4: 会話文から理解
+      missionText = currentTargetWord.dialogue;
+      hintText = `💡 「${currentTargetWord.dialogueMeaning}」のキーワードを撃て！`;
+    }
+
+    document.getElementById('mission-target').textContent = missionText;
+    document.getElementById('mission-hint').textContent = hintText;
+    speakHangeul(currentTargetWord.word); // ターゲットの発音を読み上げ
+    updateHUD();
+  } else {
+    currentTargetWord = null;
+    triggerStageClear();
+  }
+}
+
+// 現在のターゲットの発音をリプレイ（Lキー／ボタン）
+function replayTargetWord() {
+  if (currentTargetWord) speakHangeul(currentTargetWord.word);
+}
+
+// ============================================================
+// ③ コンボ・イベント・バナー ヘルパー
+// ============================================================
+function resetCombo() {
+  combo = 0;
+  comboTimer = 0;
+  updateComboUI();
+}
+function addCombo() {
+  combo++;
+  comboTimer = COMBO_TIMEOUT;
+  updateComboUI();
+}
+function updateComboUI() {
+  const el = document.getElementById('combo-display');
+  if (!el) return;
+  if (combo >= 2) {
+    el.style.visibility = 'visible';
+    const mult = getComboMultiplier();
+    el.innerHTML = `<span style="font-size:32px;">${combo}</span> COMBO! <span style="color:var(--neon-yellow)">x${mult}</span>`;
+  } else {
+    el.style.visibility = 'hidden';
+  }
+}
+
+// 中央バナー表示（一時的）
+let bannerTimer = null;
+function showBanner(text, color) {
+  const el = document.getElementById('big-banner');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = color || '#fff';
+  el.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ランダムイベント発生
+function maybeStartEvent() {
+  if (activeEvent || isBossStage) return;
+  // 25%の確率でイベント発生
+  if (Math.random() < 0.25) {
+    if (Math.random() < 0.5) {
+      activeEvent = 'timeattack';
+      eventTimer = 8.0;
+      showBanner('⏱ TIME ATTACK! 8秒以内に倒せ！', '#ff007f');
+    } else {
+      activeEvent = 'bonus';
+      eventTimer = 10.0;
+      // 残っている敵からボーナス対象を選ぶ
+      const rem = stageWords.filter(w => !completedStageWords.includes(w));
+      bonusWord = rem[Math.floor(Math.random() * rem.length)];
+      if (bonusWord) {
+        const e = activeEnemies.find(en => en.data.word === bonusWord.word);
+        if (e) e.isBonus = true;
+        showBanner(`💎 BONUS: 「${bonusWord.meaning}」を狙え！x5点`, '#ffee00');
+      }
+    }
+  }
+}
+function clearEvent() {
+  activeEvent = null;
+  eventTimer = 0;
+  bonusWord = null;
+  const el = document.getElementById('event-display');
+  if (el) el.style.visibility = 'hidden';
+}
+
+// ============================================================
+// 音声合成 (Web Speech API)
+// ============================================================
+function speakHangeul(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel(); // 前の音声を止める
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ko-KR';
+    utterance.rate = 0.85;
+
+    // 音声リストの取得（ブラウザ互換性対応）
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.startsWith('ko'));
+    if (koVoice) {
+      utterance.voice = koVoice;
+    }
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
+// 最初の音声ロードダミー (一部ブラウザはイベント発火を待つ必要がある)
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  }
+}
+
+// ============================================================
+// プレイヤーアクション (移動・射撃)
+// ============================================================
+const bullets = [];
+const bulletGeo = new THREE.SphereGeometry(0.12, 8, 8);
+const bulletMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+
+const bulletMatCharged = new THREE.MeshBasicMaterial({ color: 0xffee00 });
+
+function shoot() {
+  if (gameState !== 'playing' || overheated) return;
+
+  const charged = chargedShot;
+  chargedShot = false; // 1発で消費
+
+  const dir = new THREE.Vector3(-Math.sin(player.angle), 0, -Math.cos(player.angle)).normalize();
+
+  // 弾丸の生成（チャージ時は大きく黄色く）
+  const bulletMesh = new THREE.Mesh(bulletGeo, charged ? bulletMatCharged : bulletMat);
+  if (charged) bulletMesh.scale.setScalar(2.2);
+  bulletMesh.position.copy(playerGroup.position);
+  bulletMesh.position.y = 0.9;
+  bulletMesh.position.addScaledVector(dir, 0.8); // 銃口付近から射出
+  scene.add(bulletMesh);
+
+  bullets.push({
+    mesh: bulletMesh,
+    dir: dir,
+    life: 2.0, // 2秒で自動消滅
+    damage: charged ? 60 : 20,
+    charged: charged
+  });
+
+  // マズルフラッシュ
+  muzzleLight.intensity = charged ? 8 : 4;
+  setTimeout(() => muzzleLight.intensity = 0, 50);
+
+  // ヒート量加算（チャージショットは熱を出さない）
+  if (!charged) {
+    weaponHeat = Math.min(MAX_HEAT, weaponHeat + HEAT_PER_SHOT);
+    if (weaponHeat >= MAX_HEAT) {
+      overheated = true;
+      document.getElementById('overheat-warning').style.visibility = 'visible';
+    }
+  }
+}
+
+// ============================================================
+// コリジョン＆ゲームロジック
+// ============================================================
+const particles = [];
+
+// 敵撃破時のネオン火花エフェクト
+function createExplosion(pos, colorHex) {
+  const particleCount = 20;
+  const geom = new THREE.BufferGeometry();
+  const positions = [];
+  const velocities = [];
+
+  for (let i = 0; i < particleCount; i++) {
+    positions.push(pos.x, pos.y + 0.5, pos.z);
+    velocities.push(
+      (Math.random() - 0.5) * 8,
+      (Math.random()) * 6,
+      (Math.random() - 0.5) * 8
+    );
+  }
+
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: colorHex,
+    size: 0.25,
+    transparent: true,
+    opacity: 1.0,
+    blending: THREE.AdditiveBlending
+  });
+
+  const pSystem = new THREE.Points(geom, mat);
+  scene.add(pSystem);
+
+  particles.push({
+    system: pSystem,
+    velocities: velocities,
+    life: 0.8
+  });
+}
+
+// 衝突判定と敵へのダメージ処理
+function checkBulletHits(dt) {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    
+    // 障害物との衝突（AABB点判定。弾は細いのでマージン無しの実寸で判定）
+    let wallHit = false;
+    for (let c = 0; c < covers.length; c++) {
+      const cover = covers[c];
+      const hw = cover.userData.hw - 0.5; // マージンを除いた実寸
+      const hd = cover.userData.hd - 0.5;
+      if (Math.abs(b.mesh.position.x - cover.position.x) < hw &&
+          Math.abs(b.mesh.position.z - cover.position.z) < hd) {
+        scene.remove(b.mesh);
+        bullets.splice(i, 1);
+        wallHit = true;
+        break;
+      }
+    }
+    if (wallHit) continue;
+
+    // 敵との衝突
+    for (let j = activeEnemies.length - 1; j >= 0; j--) {
+      const e = activeEnemies[j];
+      if (e.dead) continue;
+
+      const dist = b.mesh.position.distanceTo(e.group.position);
+      if (dist < 1.1) {
+        // 弾を消去
+        scene.remove(b.mesh);
+        bullets.splice(i, 1);
+
+        // 正誤判定
+        if (currentTargetWord && e.data.word === currentTargetWord.word) {
+          // 正解のターゲットを撃った！
+          e.hp -= (b.damage || 20);
+          e.flashTimer = 0.15;
+
+          // 暴走中だった場合は鎮圧ボーナス
+          if (e.isAngry) {
+            showNotification('🎯 CALM DOWN! BONUS +50!', 'correct');
+            score += 50;
+            e.isAngry = false;
+            e.speed = e.baseSpeed;
+            e.bodyMaterial.color.setHex(0x2a0815);
+            e.bodyMaterial.emissive.setHex(0x000000);
+            e.eyeLeft.material.color.setHex(0xff0055);
+            e.eyeRight.material.color.setHex(0xff0055);
+            e.group.remove(e.textSprite);
+            e.textSprite = createHangeulSprite(e.data.word, false);
+            e.textSprite.position.set(0, 2.2, 0);
+            e.group.add(e.textSprite);
+          } else {
+            showNotification('CORRECT TARGET!', 'correct');
+          }
+
+          if (e.hp <= 0) {
+            e.dead = true;
+            createExplosion(e.group.position, e.isBonus ? 0xffee00 : 0x00f0ff);
+            speakHangeul(e.data.word);
+            completedStageWords.push(e.data);
+            scene.remove(e.group);
+            activeEnemies.splice(j, 1);
+
+            // ① 習熟度記録（正解）
+            recordResult(e.data.word, true);
+
+            // ③ コンボ加算＆得点（倍率適用）
+            addCombo();
+            const mult = getComboMultiplier();
+            let gain = 100 * currentStage * mult;
+            // ③ ボーナスターゲットなら5倍
+            if (e.isBonus) { gain *= 5; showBanner('💎 BONUS HIT! x5!', '#ffee00'); }
+            score += gain;
+
+            // ② 記憶演出（ハングル＋意味＋読みを大きく表示）
+            showMemoryFlash(e.data);
+
+            // 25%確率でHPドロップ
+            if (Math.random() < 0.25) spawnHpDrop(e.group.position.clone());
+
+            // ③ 次のターゲットへ進む前にランダムイベント抽選
+            selectNextTarget();
+            if (currentTargetWord) maybeStartEvent();
+          } else {
+            updateEnemyHpBar(e);
+          }
+        } else {
+          // ターゲットではない敵を撃ってしまった！
+          showNotification('WRONG TARGET! BUG ANGRY!', 'wrong');
+          score = Math.max(0, score - 20);
+
+          // ① 習熟度記録（不正解）＆ ③ コンボリセット
+          if (currentTargetWord) recordResult(currentTargetWord.word, false);
+          resetCombo();
+
+          if (!e.isAngry) {
+            e.isAngry = true;
+            e.speed = e.baseSpeed * 1.8;
+            e.bodyMaterial.color.setHex(0xff0033);
+            e.bodyMaterial.emissive.setHex(0x550000);
+            e.eyeLeft.material.color.setHex(0xffff00);
+            e.eyeRight.material.color.setHex(0xffff00);
+            e.group.remove(e.textSprite);
+            e.textSprite = createHangeulSprite(e.data.word, true);
+            e.textSprite.position.set(0, 2.2, 0);
+            e.group.add(e.textSprite);
+          }
+          e.flashTimer = 0.15;
+        }
+        updateHUD();
+        break;
+      }
+    }
+  }
+}
+
+// ② 記憶演出: 撃破した単語を大きく表示して記憶に焼き付ける
+function showMemoryFlash(data) {
+  const el = document.getElementById('memory-flash');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="font-size:48px; color:var(--neon-green); font-weight:900;">${data.word}</div>
+    <div style="font-size:18px; color:var(--neon-blue);">${data.romaji}</div>
+    <div style="font-size:22px; color:#fff; margin-top:4px;">＝ ${data.meaning}</div>
+  `;
+  el.classList.remove('show');
+  void el.offsetWidth; // reflowでアニメ再生
+  el.classList.add('show');
+}
+
+// shooterタイプの敵が弾を撃つ
+function fireEnemyBullet(e, nx, nz) {
+  const mesh = new THREE.Mesh(enemyBulletGeo, enemyBulletMat);
+  mesh.position.copy(e.group.position);
+  mesh.position.y = 0.9;
+  mesh.position.x += nx * 1.0;
+  mesh.position.z += nz * 1.0;
+  scene.add(mesh);
+  enemyBullets.push({ mesh, dir: { x: nx, z: nz }, life: 4.0 });
+}
+
+// 敵弾の更新（プレイヤーへの当たり判定含む）
+function updateEnemyBullets(dt) {
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    const b = enemyBullets[i];
+    b.mesh.position.x += b.dir.x * 12 * dt;
+    b.mesh.position.z += b.dir.z * 12 * dt;
+    b.life -= dt;
+
+    // プレイヤーに命中
+    const pdx = b.mesh.position.x - playerGroup.position.x;
+    const pdz = b.mesh.position.z - playerGroup.position.z;
+    if (Math.sqrt(pdx*pdx + pdz*pdz) < 1.0) {
+      if (player.invincibleTimer <= 0) {
+        player.hp -= 8;
+        player.invincibleTimer = 0.3;
+        camera.position.x += (Math.random() - 0.5) * 0.3;
+        updateHUD();
+        if (player.hp <= 0) triggerGameOver();
+      }
+      scene.remove(b.mesh);
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // 障害物・寿命・場外で消滅
+    let hitWall = false;
+    for (const c of covers) {
+      const hw = c.userData.hw - 0.5, hd = c.userData.hd - 0.5;
+      if (Math.abs(b.mesh.position.x - c.position.x) < hw &&
+          Math.abs(b.mesh.position.z - c.position.z) < hd) { hitWall = true; break; }
+    }
+    if (hitWall || b.life <= 0 ||
+        Math.abs(b.mesh.position.x) > 25 || Math.abs(b.mesh.position.z) > 25) {
+      scene.remove(b.mesh);
+      enemyBullets.splice(i, 1);
+    }
+  }
+}
+
+// 敵弾を全消去（ステージ切り替え時）
+function clearEnemyBullets() {
+  enemyBullets.forEach(b => scene.remove(b.mesh));
+  enemyBullets.length = 0;
+}
+
+// HPドロップ生成
+function spawnHpDrop(pos) {
+  const mesh = new THREE.Mesh(hpDropGeo, hpDropMat.clone());
+  mesh.position.copy(pos);
+  mesh.position.y = 0.5;
+  scene.add(mesh);
+  const light = new THREE.PointLight(0x44ff44, 3, 4);
+  light.position.copy(mesh.position);
+  scene.add(light);
+  hpDrops.push({ mesh, light, life: 8.0 });
+}
+
+// SOSボム
+// ============================================================
+// QWERスキルの発動
+// ============================================================
+function castSkill(key) {
+  if (gameState !== 'playing') return;
+  const s = SKILLS[key];
+  if (!s) return;
+
+  // R はステージ条件で解放
+  if (s.minStage && currentStage < s.minStage) {
+    showNotification(`🔒 ${s.name} はSTAGE ${s.minStage}で解放`, 'wrong');
+    return;
+  }
+  // クールダウン中
+  if (skillCd[key] > 0) {
+    showNotification(`${s.icon} ${s.name} CD ${Math.ceil(skillCd[key])}s`, 'wrong');
+    return;
+  }
+  // マナ不足
+  if (mana < s.cost) {
+    showNotification(`🔵 マナ不足 (${Math.floor(mana)}/${s.cost})`, 'wrong');
+    return;
+  }
+
+  // 消費＆クールダウン
+  mana -= s.cost;
+  skillCd[key] = s.cd;
+
+  if (key === 'Q') {
+    // チャージショット：次の射撃を強化
+    chargedShot = true;
+    showNotification('🎯 CHARGED! 次の弾が強力に', 'correct');
+  } else if (key === 'W') {
+    // ダッシュ（無敵回避）
+    dashTimer = DASH_DURATION;
+    dashCooldown = DASH_COOLDOWN;
+    player.invincibleTimer = DASH_DURATION;
+    showNotification('⚡ DASH!', 'correct');
+  } else if (key === 'E') {
+    // スロウフィールド：周囲の敵を減速
+    slowFieldTimer = SLOW_DURATION;
+    showSlowField();
+    showNotification('🌀 SLOW FIELD! 敵が減速', 'correct');
+  } else if (key === 'R') {
+    // アルティメット FREEZE：全敵停止＋暴走鎮静
+    freezeTimer = FREEZE_DURATION;
+    createExplosion(playerGroup.position, 0xffee00);
+    activeEnemies.forEach(e => {
+      if (e.isAngry) {
+        e.isAngry = false;
+        e.speed = e.baseSpeed;
+        e.bodyMaterial.color.setHex(e.type.baseColor);
+        e.bodyMaterial.emissive.setHex(e.type.color);
+        e.eyeLeft.material.color.setHex(0xff2255);
+        e.eyeRight.material.color.setHex(0xff2255);
+      }
+    });
+    showBanner('❄️ TIME FREEZE!', '#ffee00');
+  }
+  updateHUD();
+}
+
+// スロウフィールドの視覚エフェクト（地面の円）
+function showSlowField() {
+  if (slowFieldMesh) scene.remove(slowFieldMesh);
+  slowFieldMesh = new THREE.Mesh(
+    new THREE.RingGeometry(SLOW_RADIUS - 0.4, SLOW_RADIUS, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff007f, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+  );
+  slowFieldMesh.rotation.x = -Math.PI / 2;
+  slowFieldMesh.position.y = 0.06;
+  scene.add(slowFieldMesh);
+}
+const SLOW_RADIUS = 7;
+
+function updateEnemyHpBar(e) {
+  const ratio = Math.max(0, e.hp / e.maxHp);
+  e.hpFill.scale.x = ratio;
+  // 左揃えにするためのオフセット調整
+  e.hpFill.position.x = -(1 - ratio) * 0.6;
+}
+
+// 画面中央通知の表示
+let notificationTimer = null;
+function showNotification(text, type) {
+  const el = document.getElementById('alert-overlay');
+  el.textContent = text;
+  el.className = '';
+  
+  if (type === 'correct') {
+    el.classList.add('show-correct');
+  } else {
+    el.classList.add('show-wrong');
+  }
+
+  clearTimeout(notificationTimer);
+  notificationTimer = setTimeout(() => {
+    el.className = '';
+  }, 1000);
+}
+
+// ============================================================
+// HUD・UIコントロール
+// ============================================================
+function updateHUD() {
+  document.getElementById('hp-value').textContent = Math.round(player.hp);
+  document.getElementById('hp-bar').style.width = `${Math.max(0, player.hp)}%`;
+
+  if (player.hp < 30) {
+    document.getElementById('player-panel').style.borderColor = 'var(--neon-pink)';
+    document.getElementById('hp-bar').style.background = 'linear-gradient(90deg, var(--neon-pink), #ff5500)';
+  } else {
+    document.getElementById('player-panel').style.borderColor = 'var(--neon-blue)';
+    document.getElementById('hp-bar').style.background = 'linear-gradient(90deg, var(--neon-blue), #0088ff)';
+  }
+
+  document.getElementById('stage-num').textContent = currentStage;
+  document.getElementById('score-val').textContent = String(score).padStart(4, '0');
+
+  const remaining = stageWords.length - completedStageWords.length;
+  document.getElementById('remaining-targets').textContent = remaining;
+
+  // ランク表示
+  const rank = getCurrentRank();
+  const rankEl = document.getElementById('rank-display');
+  if (rankEl) {
+    rankEl.textContent = `🏅 ${rank.name}`;
+    rankEl.style.color = rank.color;
+    document.getElementById('rank-desc').textContent = rank.desc;
+    // 次のランクまでの進捗
+    const nextRank = RANKS.find(r => r.minScore > score);
+    if (nextRank) {
+      const prev = rank.minScore;
+      const pct = Math.round((score - prev) / (nextRank.minScore - prev) * 100);
+      document.getElementById('rank-progress').style.width = pct + '%';
+      document.getElementById('rank-next').textContent = `NEXT: ${nextRank.name} (${nextRank.minScore - score}pts)`;
+    } else {
+      document.getElementById('rank-progress').style.width = '100%';
+      document.getElementById('rank-next').textContent = 'MAX RANK!';
+    }
+  }
+
+}
+
+// マナ＆QWERスキルバーの更新（毎フレーム呼ぶ）
+function updateSkillBar() {
+  const manaBar = document.getElementById('mana-bar');
+  if (manaBar) manaBar.style.width = (mana / maxMana * 100) + '%';
+  const manaVal = document.getElementById('mana-value');
+  if (manaVal) manaVal.textContent = Math.floor(mana);
+
+  for (const k of ['Q','W','E','R']) {
+    const slot = document.getElementById('skill-' + k);
+    if (!slot) continue;
+    const s = SKILLS[k];
+    const cdEl = slot.querySelector('.skill-cd');
+    const locked = s.minStage && currentStage < s.minStage;
+    if (locked) {
+      slot.classList.add('locked');
+      cdEl.textContent = '🔒';
+    } else if (skillCd[k] > 0) {
+      slot.classList.remove('locked');
+      slot.classList.add('cooling');
+      cdEl.textContent = Math.ceil(skillCd[k]);
+    } else if (mana < s.cost) {
+      slot.classList.remove('cooling', 'locked');
+      slot.classList.add('no-mana');
+      cdEl.textContent = '';
+    } else {
+      slot.classList.remove('cooling', 'locked', 'no-mana');
+      cdEl.textContent = '';
+    }
+  }
+}
+
+// ============================================================
+// シーン制御
+// ============================================================
+function resetSkills() {
+  mana = maxMana;
+  skillCd.Q = skillCd.W = skillCd.E = skillCd.R = 0;
+  chargedShot = false;
+  dashCooldown = 0; dashTimer = 0;
+}
+
+function startGame() {
+  document.getElementById('title-screen').classList.add('hidden');
+  gameState = 'playing';
+  currentStage = 1;
+  score = 0;
+  player.hp = 100;
+  resetSkills();
+  playerGroup.position.set(0, 0, 18);
+  startStage(currentStage);
+}
+
+function restartGame() {
+  document.getElementById('gameover-screen').classList.add('hidden');
+  gameState = 'playing';
+  score = 0;
+  player.hp = 100;
+  resetSkills();
+  playerGroup.position.set(0, 0, 18);
+  startStage(currentStage);
+}
+
+let quizAnswer = null; // 現在の復習テストの正解単語
+
+function triggerStageClear() {
+  gameState = 'clear';
+  document.getElementById('clear-screen').classList.remove('hidden');
+
+  // クリアした単語リストをUIに表示
+  const container = document.getElementById('learned-words-container');
+  container.innerHTML = '';
+  stageWords.forEach(w => {
+    const item = document.createElement('div');
+    item.className = 'word-item';
+    item.innerHTML = `
+      <span class="hangeul">${w.word} (${w.romaji})</span>
+      <span class="meaning">${w.meaning}</span>
+    `;
+    container.appendChild(item);
+  });
+
+  // 覚えた単語から1問テストを出題
+  buildClearQuiz();
+}
+
+// STAGE CLEAR時の復習テスト（4択）
+function buildClearQuiz() {
+  const quizBox = document.getElementById('clear-quiz');
+  const learned = getLearnedWords();
+  // 習得語が3つ未満ならテストはスキップ（このステージの単語から出す）
+  const pool = learned.length >= 3 ? learned : stageWords;
+  if (pool.length < 2) { quizBox.style.display = 'none'; return; }
+  quizBox.style.display = 'block';
+
+  // 苦手な単語を優先して出題
+  const sorted = [...pool].sort((a, b) => getWeakness(b.word) - getWeakness(a.word));
+  // 上位半分からランダムに選ぶ
+  const topHalf = sorted.slice(0, Math.max(2, Math.ceil(sorted.length / 2)));
+  quizAnswer = topHalf[Math.floor(Math.random() * topHalf.length)];
+
+  document.getElementById('quiz-word').textContent = quizAnswer.word;
+  document.getElementById('quiz-romaji').textContent = `(${quizAnswer.romaji})`;
+  document.getElementById('quiz-feedback').textContent = '';
+  document.getElementById('next-sector-btn').textContent = 'まず答えてね 👆';
+
+  // 発音を読み上げ
+  speakHangeul(quizAnswer.word);
+
+  // 選択肢4つ（正解＋ダミー3つ）
+  const dummies = koreanData
+    .filter(d => d.word !== quizAnswer.word)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+  const choices = [quizAnswer, ...dummies].sort(() => Math.random() - 0.5);
+
+  const choicesEl = document.getElementById('quiz-choices');
+  choicesEl.innerHTML = '';
+  choices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.style.cssText = 'font-size:16px; padding:12px; border-color:#888; color:#fff;';
+    btn.textContent = c.meaning;
+    btn.onclick = () => answerClearQuiz(c, btn);
+    choicesEl.appendChild(btn);
+  });
+}
+
+function answerClearQuiz(choice, btn) {
+  if (!quizAnswer) return;
+  const fb = document.getElementById('quiz-feedback');
+  const correct = choice.word === quizAnswer.word;
+  // 習熟度に反映
+  recordResult(quizAnswer.word, correct);
+
+  // 全ボタン無効化
+  document.querySelectorAll('#quiz-choices button').forEach(b => {
+    b.disabled = true;
+    if (b.textContent === quizAnswer.meaning) {
+      b.style.borderColor = 'var(--neon-green)';
+      b.style.color = 'var(--neon-green)';
+    }
+  });
+
+  if (correct) {
+    fb.textContent = '🎉 正解！ +100pt';
+    fb.style.color = 'var(--neon-green)';
+    score += 100;
+    updateHUD();
+  } else {
+    fb.innerHTML = `❌ 不正解… 正解は「${quizAnswer.meaning}」`;
+    fb.style.color = 'var(--neon-pink)';
+    btn.style.borderColor = 'var(--neon-pink)';
+    btn.style.color = 'var(--neon-pink)';
+  }
+  speakHangeul(quizAnswer.word);
+  document.getElementById('next-sector-btn').textContent = 'NEXT SECTOR ▶';
+  quizAnswer = null;
+}
+
+// 復習テストの発音リプレイ
+function replayQuizWord() {
+  const word = document.getElementById('quiz-word').textContent;
+  if (word) speakHangeul(word);
+}
+
+function nextStage() {
+  document.getElementById('clear-screen').classList.add('hidden');
+  currentStage++;
+  player.hp = Math.min(100, player.hp + 30); // クリア時に少しHP回復
+  playerGroup.position.set(0, 0, 18);
+  gameState = 'playing';
+  startStage(currentStage);
+}
+
+function triggerGameOver() {
+  gameState = 'gameover';
+  document.getElementById('gameover-screen').classList.remove('hidden');
+  document.getElementById('go-stage').textContent = currentStage;
+  document.getElementById('go-score').textContent = score;
+}
+
+// ============================================================
+// 入力イベントリスナー (キーボード＆マウス)
+// ============================================================
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.code === 'Space') { e.preventDefault(); shoot(); }
+  // スキル（Wは移動キーなので、ダッシュはShiftに割り当て）
+  if (e.code === 'KeyQ') { e.preventDefault(); castSkill('Q'); }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { e.preventDefault(); castSkill('W'); }
+  if (e.code === 'KeyE') { e.preventDefault(); castSkill('E'); }
+  if (e.code === 'KeyR') { e.preventDefault(); castSkill('R'); }
+  if (e.code === 'KeyL') { e.preventDefault(); replayTargetWord(); } // 発音リプレイ
+});
+window.addEventListener('keyup', e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+const mouse = new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+window.addEventListener('mousemove', e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+});
+
+window.addEventListener('mousedown', e => {
+  if (gameState === 'playing') {
+    shoot();
+  }
+});
+
+// ============================================================
+// ゲームループ (毎フレーム実行)
+// ============================================================
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05); // 最大フレーム間隔を制限
+  elapsed += dt;
+
+  // 1. 武器熱量の冷却
+  if (overheated) {
+    weaponHeat = Math.max(0, weaponHeat - OVERHEAT_COOL_DOWN_SPEED * dt);
+    if (weaponHeat <= 0) {
+      overheated = false;
+      document.getElementById('overheat-warning').style.visibility = 'hidden';
+    }
+  } else {
+    weaponHeat = Math.max(0, weaponHeat - COOL_DOWN_SPEED * dt);
+  }
+  
+  // UIヒートバー更新
+  document.getElementById('heat-bar').style.width = `${weaponHeat}%`;
+  document.getElementById('heat-value').textContent = `${Math.round(weaponHeat)}%`;
+
+  if (gameState === 'playing') {
+    // --- クールダウン更新 ---
+    if (dashCooldown > 0) dashCooldown = Math.max(0, dashCooldown - dt);
+    if (dashTimer > 0) dashTimer = Math.max(0, dashTimer - dt);
+    if (sosCooldown > 0) sosCooldown = Math.max(0, sosCooldown - dt);
+
+    // --- マナ回復＆スキルCD更新 ---
+    mana = Math.min(maxMana, mana + MANA_REGEN * dt);
+    for (const k in skillCd) {
+      if (skillCd[k] > 0) skillCd[k] = Math.max(0, skillCd[k] - dt);
+    }
+
+    // --- E: スロウフィールドのタイマー＆エフェクト ---
+    if (slowFieldTimer > 0) {
+      slowFieldTimer -= dt;
+      if (slowFieldMesh) {
+        slowFieldMesh.position.x = playerGroup.position.x;
+        slowFieldMesh.position.z = playerGroup.position.z;
+        slowFieldMesh.rotation.z += dt * 2;
+        slowFieldMesh.material.opacity = 0.3 + Math.sin(elapsed * 8) * 0.2;
+      }
+      if (slowFieldTimer <= 0 && slowFieldMesh) {
+        scene.remove(slowFieldMesh);
+        slowFieldMesh = null;
+      }
+    }
+
+    // --- R: フリーズのタイマー ---
+    if (freezeTimer > 0) freezeTimer -= dt;
+
+    // --- ③ コンボタイマー（時間切れでリセット）---
+    if (combo >= 2) {
+      comboTimer -= dt;
+      if (comboTimer <= 0) { resetCombo(); }
+    }
+
+    // --- ③ ランダムイベントタイマー ---
+    if (activeEvent) {
+      eventTimer -= dt;
+      const evEl = document.getElementById('event-display');
+      if (evEl) {
+        evEl.style.visibility = 'visible';
+        if (activeEvent === 'timeattack') {
+          evEl.textContent = `⏱ TIME ATTACK: ${eventTimer.toFixed(1)}s`;
+          evEl.style.color = '#ff007f';
+        } else if (activeEvent === 'bonus') {
+          evEl.textContent = `💎 BONUS残り: ${eventTimer.toFixed(1)}s`;
+          evEl.style.color = '#ffee00';
+        }
+      }
+      if (eventTimer <= 0) {
+        if (activeEvent === 'timeattack') {
+          // 時間切れ: HPペナルティ＆コンボリセット
+          player.hp = Math.max(1, player.hp - 10);
+          showBanner('⏱ TIME UP! -10HP', '#ff007f');
+          updateHUD();
+        }
+        // ボーナス敵のフラグ解除
+        activeEnemies.forEach(en => en.isBonus = false);
+        clearEvent();
+      }
+    }
+
+    // --- HPドロップアイテム更新 ---
+    for (let i = hpDrops.length - 1; i >= 0; i--) {
+      const d = hpDrops[i];
+      d.life -= dt;
+      d.mesh.rotation.y += dt * 2;
+      d.mesh.position.y = 0.5 + Math.sin(elapsed * 4 + i) * 0.15;
+      d.light.position.copy(d.mesh.position);
+      // プレイヤーが触れたら回収
+      if (d.mesh.position.distanceTo(playerGroup.position) < 1.2) {
+        player.hp = Math.min(player.maxHp, player.hp + 20);
+        showNotification('💚 HP +20 RECOVERED!', 'correct');
+        updateHUD();
+        scene.remove(d.mesh); scene.remove(d.light);
+        hpDrops.splice(i, 1);
+      } else if (d.life <= 0) {
+        scene.remove(d.mesh); scene.remove(d.light);
+        hpDrops.splice(i, 1);
+      }
+    }
+
+    // --- プレイヤーの移動処理 ---
+    const currentSpeed = dashTimer > 0 ? player.speed * DASH_SPEED_MULT : player.speed;
+    let mx = 0;
+    let mz = 0;
+    if (keys['w'] || keys['arrowup']) mz -= 1;
+    if (keys['s'] || keys['arrowdown']) mz += 1;
+    if (keys['a'] || keys['arrowleft']) mx -= 1;
+    if (keys['d'] || keys['arrowright']) mx += 1;
+
+    if (mx !== 0 || mz !== 0) {
+      const len = Math.sqrt(mx*mx + mz*mz);
+      playerGroup.position.x += (mx / len) * currentSpeed * dt;
+      playerGroup.position.z += (mz / len) * currentSpeed * dt;
+
+      // 移動制限 (外壁とのコリジョン)
+      playerGroup.position.x = Math.max(-23.5, Math.min(23.5, playerGroup.position.x));
+      playerGroup.position.z = Math.max(-23.5, Math.min(23.5, playerGroup.position.z));
+
+      // 障害物との衝突判定 (AABB押し戻し)
+      resolveCoverCollision(playerGroup.position);
+
+      // 歩行ボビングアニメーション
+      playerBody.position.y = 0.95 + Math.sin(elapsed * 12) * 0.05;
+      playerHead.position.y = 1.72 + Math.sin(elapsed * 12 + 0.3) * 0.03;
+    }
+
+    // --- プレイヤーの照準(回転)処理 ---
+    raycaster.setFromCamera(mouse, camera);
+    const hitPoint = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(groundPlane, hitPoint)) {
+      const dx = hitPoint.x - playerGroup.position.x;
+      const dz = hitPoint.z - playerGroup.position.z;
+      if (Math.abs(dx) + Math.abs(dz) > 0.2) {
+        player.angle = Math.atan2(-dx, -dz);
+        playerGroup.rotation.y = player.angle;
+      }
+    }
+
+    // 無敵タイマー更新（点滅、平常時は本来の発光色に戻す）
+    if (player.invincibleTimer > 0) {
+      player.invincibleTimer -= dt;
+      playerBody.material.emissive.setHex(Math.sin(elapsed * 25) > 0 ? 0x0088ff : 0x0a3a66);
+    } else {
+      playerBody.material.emissive.setHex(0x0a3a66);
+    }
+
+    // --- カメラのスムーズ追従 ---
+    const targetCamPos = playerGroup.position.clone().add(new THREE.Vector3(0, 11, 14));
+    camera.position.lerp(targetCamPos, 0.08);
+    const targetLookAt = playerGroup.position.clone().add(new THREE.Vector3(0, 1.0, -1.0));
+    camera.lookAt(targetLookAt);
+
+    // --- 弾丸の挙動更新 ---
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.mesh.position.addScaledVector(b.dir, 24 * dt);
+      b.life -= dt;
+
+      if (b.life <= 0 ||
+          Math.abs(b.mesh.position.x) > 25 ||
+          Math.abs(b.mesh.position.z) > 25) {
+        scene.remove(b.mesh);
+        bullets.splice(i, 1);
+      }
+    }
+
+    // 衝突判定
+    checkBulletHits(dt);
+
+    // 敵弾の更新
+    updateEnemyBullets(dt);
+
+    // --- 敵の挙動更新 ---
+    activeEnemies.forEach(e => {
+      const dx = playerGroup.position.x - e.group.position.x;
+      const dz = playerGroup.position.z - e.group.position.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+
+      // プレイヤーを追う回転
+      e.group.rotation.y = Math.atan2(dx, dz);
+
+      // --- スロウ/フリーズの実効速度（一時的にe.speedを上書き）---
+      let speedFactor = 1;
+      if (freezeTimer > 0) speedFactor = 0;                                  // R: 完全停止
+      else if (slowFieldTimer > 0 && dist < SLOW_RADIUS) speedFactor = SLOW_MULT; // E: 範囲内は減速
+      const _origSpeed = e.speed;
+      e.speed = e.speed * speedFactor;
+
+      // --- タイプ別の移動パターン ---
+      const nx = dist > 0.001 ? dx / dist : 0;
+      const nz = dist > 0.001 ? dz / dist : 0;
+
+      if (e.behavior === 'shooter') {
+        // 射撃型: 一定距離(10)を保つ。近すぎたら後退、遠ければ接近
+        const KEEP = 10;
+        if (dist < KEEP - 1.5) {
+          e.group.position.x -= nx * e.speed * dt;
+          e.group.position.z -= nz * e.speed * dt;
+        } else if (dist > KEEP + 1.5) {
+          e.group.position.x += nx * e.speed * dt;
+          e.group.position.z += nz * e.speed * dt;
+        } else {
+          // 横方向にゆっくりストレイフ
+          e.group.position.x += -nz * e.speed * 0.5 * dt;
+          e.group.position.z += nx * e.speed * 0.5 * dt;
+        }
+        // 弾を撃つ（フリーズ中は撃たない）
+        if (freezeTimer <= 0) {
+          e.shootCooldown -= dt;
+          if (e.shootCooldown <= 0 && dist < 18) {
+            fireEnemyBullet(e, nx, nz);
+            e.shootCooldown = 2.0 + Math.random() * 1.0;
+          }
+        }
+      } else if (e.behavior === 'zigzag') {
+        // 高速ジグザグ型: 接近しつつ左右に蛇行
+        e.zigzagPhase += dt * 6;
+        const strafe = Math.sin(e.zigzagPhase) * 0.8;
+        if (dist > 1.2) {
+          e.group.position.x += (nx + (-nz) * strafe) * e.speed * dt;
+          e.group.position.z += (nz + (nx) * strafe) * e.speed * dt;
+        }
+      } else {
+        // 追跡型（標準）
+        if (dist > 1.2) {
+          e.group.position.x += nx * e.speed * dt;
+          e.group.position.z += nz * e.speed * dt;
+        }
+      }
+
+      // 敵同士の分離（密集して同じ方向から来るのを防ぐ）
+      const SEP_RANGE = 3.0;
+      activeEnemies.forEach(other => {
+        if (other === e || other.dead) return;
+        const odx = e.group.position.x - other.group.position.x;
+        const odz = e.group.position.z - other.group.position.z;
+        const od = Math.sqrt(odx*odx + odz*odz);
+        if (od > 0.001 && od < SEP_RANGE) {
+          const force = (SEP_RANGE - od) / SEP_RANGE; // 近いほど強く反発
+          e.group.position.x += (odx / od) * force * e.speed * 1.2 * dt;
+          e.group.position.z += (odz / od) * force * e.speed * 1.2 * dt;
+        }
+      });
+
+      // スロウ/フリーズで上書きしたe.speedを元に戻す
+      e.speed = _origSpeed;
+
+      // マップ外に出ないよう制限
+      e.group.position.x = Math.max(-23, Math.min(23, e.group.position.x));
+      e.group.position.z = Math.max(-23, Math.min(23, e.group.position.z));
+
+      // 障害物とのコリジョン (AABB押し戻し)
+      resolveCoverCollision(e.group.position);
+
+      // 攻撃（プレイヤー接触ダメージ。フリーズ中は攻撃しない）
+      if (dist < 1.3 && player.invincibleTimer <= 0 && freezeTimer <= 0) {
+        const damage = e.isAngry ? 25 : 15; // 暴走状態は攻撃力が高い
+        player.hp -= damage;
+        player.invincibleTimer = 0.5; // 無敵時間
+
+        // 画面揺れエフェクト
+        camera.position.x += (Math.random() - 0.5) * 0.4;
+        camera.position.y += (Math.random() - 0.5) * 0.3;
+
+        updateHUD();
+
+        if (player.hp <= 0) {
+          triggerGameOver();
+        }
+      }
+
+      // 被弾時のフラッシュ
+      if (e.flashTimer > 0) {
+        e.flashTimer -= dt;
+        if (e.flashTimer <= 0) {
+          e.bodyMaterial.color.setHex(e.isAngry ? 0xff0033 : (e.isBonus ? 0x665500 : e.type.baseColor));
+        } else {
+          e.bodyMaterial.color.setHex(0xffffff);
+        }
+      }
+
+      // ③ ボーナス敵は金色に脈動（タイプ固有のスケールを基準に）
+      const baseScale = e.type.scale;
+      if (e.isBonus && e.flashTimer <= 0) {
+        const pulse = 0.5 + Math.sin(elapsed * 8) * 0.5;
+        e.bodyMaterial.emissive.setRGB(pulse * 0.8, pulse * 0.6, 0);
+        e.group.scale.setScalar(baseScale * (1.1 + pulse * 0.1));
+      } else if (!e.isAngry) {
+        e.group.scale.setScalar(baseScale);
+      }
+
+      // ビルボード対応（HPバーと文字を常にカメラの方向へ向ける）
+      e.hpBg.lookAt(camera.position);
+      e.hpFill.lookAt(camera.position);
+      e.textSprite.lookAt(camera.position);
+
+      // 敵の歩行アニメーション
+      e.group.position.y = Math.sin(elapsed * 8 + e.animOffset) * 0.06;
+    });
+
+  } else {
+    // プレイ中以外は、カメラをゆっくり回転させてサイバー感を演出
+    camera.position.x = 22 * Math.sin(elapsed * 0.1);
+    camera.position.z = 22 * Math.cos(elapsed * 0.1);
+    camera.position.y = 12;
+    camera.lookAt(0, 1, 0);
+  }
+
+  // --- パーティクル更新 ---
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+
+    const positions = p.system.geometry.attributes.position.array;
+    for (let j = 0; j < positions.length / 3; j++) {
+      positions[j * 3] += p.velocities[j * 3] * dt;
+      positions[j * 3 + 1] += p.velocities[j * 3 + 1] * dt; // Y方向速度
+      p.velocities[j * 3 + 1] -= 9.8 * dt; // 重力
+      positions[j * 3 + 2] += p.velocities[j * 3 + 2] * dt;
+    }
+    p.system.geometry.attributes.position.needsUpdate = true;
+
+    p.system.material.opacity = Math.max(0, p.life / 0.8);
+
+    if (p.life <= 0) {
+      scene.remove(p.system);
+      particles.splice(i, 1);
+    }
+  }
+
+  // 背景ネオンアニメーション
+  neonLightRed.intensity = 1.8 + Math.sin(elapsed * 2.0) * 0.4;
+  neonLightBlue.intensity = 1.8 + Math.cos(elapsed * 1.5) * 0.4;
+
+  // マナ＆スキルバーの更新
+  if (gameState === 'playing') updateSkillBar();
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// リサイズハンドラ
+// ============================================================
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// 開始処理
+animate();
+</script>
+</body>
+</html>
