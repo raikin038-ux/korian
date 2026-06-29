@@ -592,35 +592,88 @@ canvas { display: block; }
   #listen-btn { pointer-events: auto; }
 }
 
-/* ============ レスポンシブ（狭い画面）============ */
+/* ============ レスポンシブ（スマホ・狭い画面）============ */
 @media (max-width: 768px) {
   #hud {
-    padding: 8px;
+    padding: 6px;
     grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto 1fr auto;
   }
-  .hud-panel { padding: 8px; }
-  #player-panel { gap: 4px; }
+  /* パネルが縦に引き伸ばされないよう上端揃え＆コンパクト化 */
+  .hud-panel { padding: 7px 9px; align-self: start; }
+  #player-panel { gap: 4px; align-self: start; }
   #player-panel, #enemy-panel { min-width: 0; }
-  .stat-label { font-size: 9px; letter-spacing: 1px; }
-  #hp-bar-bg, .hp-bar-container { width: 100px; }
-  #mission-panel { min-width: 0; max-width: 60vw; }
-  #mission-target { font-size: 18px; }
-  #mission-hint { font-size: 10px; padding: 4px 8px; }
-  #listen-btn { font-size: 10px !important; padding: 3px 8px !important; }
-  .stage-title { font-size: 14px; }
-  #score-display { font-size: 12px; }
+  .stat-label { font-size: 9px; letter-spacing: 0.5px; }
+
+  /* HP（左上）を小さく */
+  #player-panel { width: 110px; }
+  #hp-bar-bg, .hp-bar-container { width: 100%; }
+  #hp-value { font-size: 13px; }
+
+  /* ミッション（中央上）：折返しを抑えて見やすく */
+  #mission-panel { min-width: 0; max-width: 42vw; padding: 6px 8px; }
+  #mission-target { font-size: 16px; margin-top: 2px; line-height: 1.2; }
+  #mission-hint { font-size: 9px; padding: 3px 6px; margin-top: 4px; }
+  #listen-btn { font-size: 10px !important; padding: 4px 10px !important; margin-top: 4px; }
+
+  /* ステージ/スコア/ランク（右上）を圧縮 */
+  #enemy-panel { width: 130px; gap: 4px; }
+  .stage-title { font-size: 13px; }
+  #score-display { font-size: 11px; }
+  #enemy-panel > div { font-size: 10px; }
   #rank-display { font-size: 11px; }
-  #weapon-panel { width: 150px; }
-  /* スキルバーをスティックの間に収める */
-  #skill-bar { bottom: 150px; gap: 8px; }
-  .skill-slot { width: 48px; height: 48px; }
-  .skill-icon { font-size: 20px; }
-  .title-logo { font-size: 32px; }
-  .title-sub { font-size: 12px; letter-spacing: 2px; }
-  #title-screen p { font-size: 12px; padding: 0 16px; }
+  #rank-desc, #rank-next { font-size: 8px; }
+
+  /* WEAPON TEMPは隠し、MANAだけを下中央のスリムバーに（スティックの上に置いて非干渉） */
+  #weapon-panel {
+    position: fixed;
+    left: 50%; right: auto; bottom: 142px;
+    transform: translateX(-50%);
+    width: 150px; padding: 5px 10px;
+    grid-area: auto;
+  }
+  #weapon-panel > div:first-child,
+  #weapon-panel .heat-bar-container,
+  #weapon-panel #overheat-warning { display: none; } /* 武器温度は非表示 */
+
+  /* スキルボタン：右端の縦並びに（親指で押しやすく・スティックと非干渉） */
+  #skill-bar {
+    flex-direction: column;
+    left: auto; right: 8px; bottom: auto; top: 50%;
+    transform: translateY(-50%);
+    gap: 8px;
+    pointer-events: auto;
+  }
+  .skill-slot { width: 46px; height: 46px; pointer-events: auto; }
+  .skill-icon { font-size: 19px; }
+  .skill-key { font-size: 9px; }
+
+  /* 仮想スティックを少し小さく＆下に */
+  .joy-zone { width: 116px; height: 116px; bottom: 18px; }
+  #move-zone { left: 14px; }
+  #aim-zone  { right: 14px; }
+  .joy-stick { width: 50px; height: 50px; }
+
+  /* その他オーバーレイ */
+  #combo-display { right: 3%; top: 26%; font-size: 15px; }
+  #event-display { font-size: 13px; padding: 4px 12px; }
+  #memory-flash { top: 32%; }
+  #big-banner { font-size: 20px; max-width: 86vw; }
+
+  /* タイトル/クリア/オーバー画面 */
+  .title-logo { font-size: 30px; }
+  .title-sub { font-size: 11px; letter-spacing: 2px; }
+  #title-screen p { font-size: 12px; padding: 0 18px; margin-bottom: 24px; }
   .btn { font-size: 15px; padding: 12px 28px; }
-  #combo-display { right: 3%; font-size: 16px; }
-  #memory-flash { top: 30%; }
+  #quiz-choices, .stage-clear-wordlist { width: 88vw; }
+}
+
+/* 横向き・低い画面では上部パネルをさらに小さく */
+@media (max-width: 768px) and (max-height: 500px) {
+  #mission-target { font-size: 14px; }
+  .joy-zone { width: 100px; height: 100px; bottom: 10px; }
+  #weapon-panel { bottom: 118px; }
+  #skill-bar { top: 50%; right: 120px; }
 }
 </style>
 </head>
