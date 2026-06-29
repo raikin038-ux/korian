@@ -15,7 +15,6 @@
   --neon-yellow: #ffee00;
   --neon-green: #39ff14;
   --dark-bg: #05050a;
-  --panel-bg: rgba(10, 10, 20, 0.75);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; user-select: none; }
@@ -36,6 +35,7 @@ canvas { display: block; }
     repeating-linear-gradient(0deg, rgba(0,0,0,0.10) 0px, rgba(0,0,0,0.10) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 4px);
 }
 
+/* PC向け基本HUDレイアウト */
 #hud {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 10; padding: 20px;
@@ -67,6 +67,7 @@ canvas { display: block; }
 #mission-panel {
   grid-area: mission; justify-self: center; align-self: start; text-align: center;
   min-width: 320px; border-top: 4px solid var(--neon-yellow); box-shadow: 0 0 25px rgba(255, 238, 0, 0.15); border-color: rgba(255, 238, 0, 0.3);
+  cursor: pointer; /* スマホタップ用にポインタ化 */
 }
 #mission-target { font-size: 28px; font-weight: 900; color: var(--neon-yellow); text-shadow: 0 0 12px rgba(255, 238, 0, 0.6); margin-top: 4px; letter-spacing: 1px; }
 #mission-hint { font-size: 13px; color: #aaa; margin-top: 6px; background: rgba(255, 238, 0, 0.08); padding: 6px 12px; border-radius: 6px; border: 1px dashed rgba(255, 238, 0, 0.2); }
@@ -86,16 +87,14 @@ canvas { display: block; }
 
 #skill-bar {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 12px; z-index: 12;
-  pointer-events: auto; /* スマホタップ用に変更 */
+  display: flex; gap: 12px; z-index: 12; pointer-events: auto;
 }
 .skill-slot {
   position: relative; width: 58px; height: 58px;
   background: linear-gradient(135deg, rgba(12,16,30,0.9), rgba(8,10,22,0.8));
   border: 2px solid rgba(0,240,255,0.5); border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 12px rgba(0,240,255,0.2); transition: all 0.15s ease;
-  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0,240,255,0.2); transition: all 0.15s ease; cursor: pointer;
 }
 .skill-slot:active { transform: scale(0.9); }
 .skill-icon { font-size: 26px; filter: drop-shadow(0 0 4px rgba(0,240,255,0.6)); }
@@ -106,8 +105,6 @@ canvas { display: block; }
 .skill-slot.cooling .skill-icon { filter: grayscale(1) brightness(0.6); }
 .skill-slot.no-mana { border-color: rgba(80,80,100,0.5); }
 .skill-slot.no-mana .skill-icon { opacity: 0.45; }
-.skill-slot.locked { border-color: rgba(80,80,100,0.5); pointer-events: none; }
-.skill-slot.locked .skill-icon { opacity: 0.3; }
 
 @keyframes blink { from { opacity: 0.3; } to { opacity: 1; } }
 
@@ -123,14 +120,93 @@ canvas { display: block; }
 #crosshair { position: fixed; top: 50%; left: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; animation: chSpin 8s linear infinite; }
 @keyframes chSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 #crosshair::before { content: ''; position: absolute; inset: 4px; border: 1.5px solid rgba(0,240,255,0.7); border-radius: 50%; box-shadow: 0 0 8px rgba(0,240,255,0.5), inset 0 0 6px rgba(0,240,255,0.3); clip-path: polygon(0 0,35% 0,35% 12%,65% 12%,65% 0,100% 0,100% 35%,88% 35%,88% 65%,100% 65%,100% 100%,65% 100%,65% 88%,35% 88%,35% 100%,0 100%,0 65%,12% 65%,12% 35%,0 35%); }
-#crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; background: var(--neon-yellow); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 8px var(--neon-yellow); }
-.crosshair-dot { display: none; }
 
 #alert-overlay { position: fixed; top: 25%; left: 50%; transform: translate(-50%, -50%) scale(0.8); font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; padding: 12px 30px; border-radius: 8px; pointer-events: none; z-index: 15; opacity: 0; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 #alert-overlay.show-correct { opacity: 1; transform: translate(-50%, -50%) scale(1); color: var(--neon-green); background: rgba(57, 255, 20, 0.15); border: 2px solid var(--neon-green); box-shadow: 0 0 20px rgba(57, 255, 20, 0.3); }
 #alert-overlay.show-wrong { opacity: 1; transform: translate(-50%, -50%) scale(1); color: var(--neon-pink); background: rgba(255, 0, 127, 0.15); border: 2px solid var(--neon-pink); box-shadow: 0 0 20px rgba(255, 0, 127, 0.3); animation: shake 0.3s ease; }
 @keyframes shake { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 20%, 60% { transform: translate(-52%, -50%) scale(1); } 40%, 80% { transform: translate(-48%, -50%) scale(1); } }
 
+/* モバイル向けUI・ジョイスティック */
+#mobile-controls { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 11; }
+.joystick-zone { position: absolute; bottom: 10px; width: 140px; height: 140px; pointer-events: auto; touch-action: none; }
+#joy-left-zone { left: 10px; }
+#joy-right-zone { right: 10px; }
+.joystick-base { position: absolute; top: 50%; left: 50%; width: 110px; height: 110px; transform: translate(-50%, -50%); background: rgba(0, 240, 255, 0.1); border: 2px solid rgba(0, 240, 255, 0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+#joy-right-zone .joystick-base { background: rgba(255, 0, 127, 0.1); border-color: rgba(255, 0, 127, 0.3); }
+.joystick-stick { width: 45px; height: 45px; background: rgba(0, 240, 255, 0.6); border-radius: 50%; box-shadow: 0 0 10px rgba(0, 240, 255, 0.8); position: relative; }
+#joy-right-zone .joystick-stick { background: rgba(255, 0, 127, 0.6); box-shadow: 0 0 10px rgba(255, 0, 127, 0.8); }
+
+/* ========================================================
+   スマホ用 UIの徹底整理 (画面を見やすくする)
+======================================================== */
+@media (max-width: 800px) {
+  #mobile-controls { display: block; }
+  
+  /* 全体のグリッドを解除して、個別に画面端に配置 */
+  #hud { display: block; padding: 0; }
+  
+  .hud-panel {
+    position: absolute;
+    background: rgba(10, 15, 25, 0.4); /* 透明度を高くして背景を透かす */
+    backdrop-filter: blur(2px);
+    border: none !important;
+    box-shadow: none;
+    clip-path: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+
+  /* 左上: HP・熱量・マナをコンパクトにまとめる */
+  #player-panel { top: 8px; left: 8px; width: 140px; z-index: 10; gap: 4px; padding: 8px;}
+  #weapon-panel { top: 48px; left: 8px; width: 140px; z-index: 10; padding: 0 8px 8px 8px; background: transparent; }
+  .stat-label { display: none; } /* 「HP」などのテキストを消してスッキリ */
+  #hp-value, #heat-value, #mana-value { font-size: 11px; }
+
+  /* 中央上: お題 (ターゲット) */
+  #mission-panel {
+    top: 8px; left: 50%; transform: translateX(-50%);
+    width: auto; min-width: 140px; padding: 4px 16px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 238, 0, 0.4) !important;
+  }
+  #mission-target { font-size: 22px; margin: 0; }
+  #mission-hint { display: none; } /* スマホではヒント文を隠す */
+  #listen-btn { display: none; } /* 音声ボタンは隠す */
+  #mission-panel::after { content: "👆TAP TO LISTEN"; display: block; font-size: 9px; color: #aaa; margin-top: 2px; font-family: 'Orbitron', sans-serif;}
+
+  /* 右上: ステージとスコア */
+  #enemy-panel { top: 8px; right: 8px; width: auto; text-align: right; padding: 6px 10px;}
+  .stage-title { font-size: 14px; margin: 0; }
+  #score-display { font-size: 12px; }
+  /* 不要な情報（残りターゲット数、ランクプログレス等）を隠す */
+  #enemy-panel > div:nth-child(3), #enemy-panel > div:nth-child(4) { display: none; }
+
+  /* PC用操作ガイドは非表示 */
+  #controls-panel { display: none; }
+  
+  /* 中央下: スキルバー */
+  #skill-bar { bottom: 20px; gap: 8px; }
+  .skill-slot { width: 44px; height: 44px; border-radius: 8px; border-width: 1px; background: rgba(12,16,30,0.4); }
+  .skill-icon { font-size: 20px; }
+  .skill-key { font-size: 9px; }
+  
+  /* 中央アラート類を邪魔にならない位置へ */
+  #alert-overlay { top: 18%; font-size: 18px; padding: 8px 20px; }
+  #combo-display { top: 18%; right: 50%; transform: translateX(50%); font-size: 18px; }
+  #event-display { top: 14%; font-size: 14px; }
+
+  /* ジョイスティックを外側下部に寄せて半透明に */
+  .joystick-zone { bottom: 10px; width: 110px; height: 110px; }
+  #joy-left-zone { left: 5px; }
+  #joy-right-zone { right: 5px; }
+  .joystick-base { width: 80px; height: 80px; background: rgba(0, 240, 255, 0.05); border-color: rgba(0, 240, 255, 0.1); }
+  #joy-right-zone .joystick-base { background: rgba(255, 0, 127, 0.05); border-color: rgba(255, 0, 127, 0.1); }
+  .joystick-stick { width: 30px; height: 30px; opacity: 0.6; }
+
+  .title-logo { font-size: 32px; }
+}
+
+/* タイトル画面等 */
 .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 10, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.5s ease; }
 .screen.hidden { opacity: 0; pointer-events: none; }
 .title-logo { font-family: 'Orbitron', sans-serif; font-size: 54px; font-weight: 900; background: linear-gradient(135deg, var(--neon-blue) 0%, var(--neon-pink) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(0, 240, 255, 0.2); margin-bottom: 8px; letter-spacing: 2px; text-align: center;}
@@ -149,40 +225,6 @@ canvas { display: block; }
 .word-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; }
 .word-item .hangeul { color: #fff; font-weight: bold; }
 .word-item .meaning { color: var(--neon-blue); }
-
-/* モバイル向けUI・ジョイスティック */
-#mobile-controls { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 11; }
-.joystick-zone { position: absolute; bottom: 10px; width: 140px; height: 140px; pointer-events: auto; touch-action: none; }
-#joy-left-zone { left: 10px; }
-#joy-right-zone { right: 10px; }
-.joystick-base { position: absolute; top: 50%; left: 50%; width: 110px; height: 110px; transform: translate(-50%, -50%); background: rgba(0, 240, 255, 0.1); border: 2px solid rgba(0, 240, 255, 0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-#joy-right-zone .joystick-base { background: rgba(255, 0, 127, 0.1); border-color: rgba(255, 0, 127, 0.3); }
-.joystick-stick { width: 45px; height: 45px; background: rgba(0, 240, 255, 0.6); border-radius: 50%; box-shadow: 0 0 10px rgba(0, 240, 255, 0.8); position: relative; }
-#joy-right-zone .joystick-stick { background: rgba(255, 0, 127, 0.6); box-shadow: 0 0 10px rgba(255, 0, 127, 0.8); }
-
-@media (max-width: 800px) {
-  #mobile-controls { display: block; }
-  
-  #hud {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto;
-    grid-template-areas:
-      "player-stats enemy-stats"
-      "mission mission"
-      "weapon-status weapon-status";
-    padding: 10px; gap: 8px;
-  }
-  .hud-panel { padding: 10px; }
-  #player-panel { border-left-width: 2px; }
-  #enemy-panel { border-right-width: 2px; }
-  #mission-panel { min-width: auto; padding: 8px; }
-  #mission-target { font-size: 22px; }
-  #controls-panel { display: none; }
-  #weapon-panel { grid-area: weapon-status; width: 100%; border-right: none; border-bottom: 2px solid var(--neon-pink); justify-self: center; background: transparent; box-shadow: none; padding: 0;}
-  
-  #skill-bar { bottom: 160px; transform: translateX(-50%) scale(0.9); }
-  .title-logo { font-size: 36px; }
-}
 </style>
 </head>
 <body>
@@ -191,6 +233,7 @@ canvas { display: block; }
 
 <!-- SF HUD -->
 <div id="hud">
+  <!-- 左上: HP -->
   <div id="player-panel" class="hud-panel">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <span class="stat-label">❤️ HP</span>
@@ -199,13 +242,15 @@ canvas { display: block; }
     <div class="hp-bar-container"><div id="hp-bar"></div></div>
   </div>
 
-  <div id="mission-panel" class="hud-panel">
+  <!-- 中央上: ミッション（スマホ時はタップで発音） -->
+  <div id="mission-panel" class="hud-panel" onclick="replayTargetWord()">
     <span class="stat-label" style="color:var(--neon-yellow);">🎯 TARGET</span>
     <div id="mission-target">お題ロード中</div>
     <div id="mission-hint">ヒント</div>
-    <button id="listen-btn" onclick="replayTargetWord()" style="margin-top:6px; font-family:'Orbitron'; font-size:12px; padding:5px 14px; background:transparent; border:1px solid var(--neon-yellow); color:var(--neon-yellow); border-radius:14px; cursor:pointer;">🔊 発音</button>
+    <button id="listen-btn">🔊 発音(L)</button>
   </div>
 
+  <!-- 右上: ステージとスコア -->
   <div id="enemy-panel" class="hud-panel">
     <div class="stage-title">STAGE <span id="stage-num">1</span></div>
     <div id="score-display">SCORE: <span id="score-val">0000</span></div>
@@ -220,10 +265,12 @@ canvas { display: block; }
     </div>
   </div>
 
+  <!-- 左下: 操作パネル (PCのみ) -->
   <div id="controls-panel" class="hud-panel">
     <strong>[CONTROLS]</strong><br>WASD: 移動 ／ マウス: 射撃<br>Q: 強化 / Shift: ダッシュ<br>E: スロウ / R: 停止(ULT)
   </div>
 
+  <!-- スマホ時は左上のHPの下に配置される熱量・マナ -->
   <div id="weapon-panel" class="hud-panel">
     <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
       <span class="stat-label" style="color:var(--neon-pink);">🔥 TEMP</span>
@@ -268,10 +315,10 @@ canvas { display: block; }
   <h1 class="title-logo">NEON HANGEUL SNIPER</h1>
   <div class="title-sub">TRANSLATION TARGETING TPS</div>
   <p style="max-width: 500px; text-align: center; color: #aaa; margin-bottom: 40px; font-size: 14px; line-height: 1.6; padding: 0 20px;">
-    左スティック：移動 ／ 右スティック：照準＆自動射撃<br><br>
-    画面中央のお題に一致するハングルを狙撃せよ。<br>
+    【スマホ操作】<br>左スティック：移動 ／ 右スティック：照準＆自動射撃<br>
+    画面上部のお題をタップで発音確認！<br><br>
+    画面上部のお題に一致するハングルを狙撃せよ。<br>
     ターゲット以外を撃つと凶暴化するぞ！<br>
-    <span style="color:#3399ff;">下のスキルボタンをタップして戦況を覆せ！</span>
   </p>
   <button class="btn" onclick="startGame()">START MISSION</button>
 </div>
@@ -317,7 +364,7 @@ const joyRight = { active: false, x: 0, y: 0, shooting: false };
 function setupJoystick(zoneId, stickId, joyData, isRight) {
   const zone = document.getElementById(zoneId);
   const stick = document.getElementById(stickId);
-  const maxRadius = 40;
+  const maxRadius = 35;
   let identifier = null;
 
   function updateStick(e) {
@@ -379,7 +426,7 @@ setupJoystick('joy-right-zone', 'joy-right-stick', joyRight, true);
 let autoShootTimer = 0;
 
 // ---------------------------------------------------
-// ゲームデータ ＆ システム (既存コードの移植)
+// ゲームデータ ＆ システム (既存コード)
 // ---------------------------------------------------
 const koreanData = [
   { word:'안녕', romaji:'annyeong', meaning:'こんにちは', hint:'挨拶', sentence:'안녕! 잘 지냈어?', sentenceMeaning:'こんにちは！元気？', dialogue:'A: 안녕하세요!\nB: 네!', dialogueMeaning:'A: こんにちは\nB: はい！' },
@@ -567,7 +614,19 @@ function animate() {
     }
 
     if(player.invincibleTimer>0) { player.invincibleTimer-=dt; pBody.material.emissive.setHex(Math.sin(elapsed*25)>0?0x0088ff:0x0a3a66); } else pBody.material.emissive.setHex(0x0a3a66);
-    camera.position.lerp(playerGroup.position.clone().add(new THREE.Vector3(0,11,14)), 0.08); camera.lookAt(playerGroup.position.clone().add(new THREE.Vector3(0,1,-1)));
+    
+    // ==========================================
+    // カメラ位置の調整 (スマホ時は高く引く)
+    // ==========================================
+    const isMobile = innerWidth < 800;
+    const camTarget = playerGroup.position.clone();
+    if (isMobile) {
+      camTarget.add(new THREE.Vector3(0, 18, 10)); // スマホ用見下ろしカメラ
+    } else {
+      camTarget.add(new THREE.Vector3(0, 11, 14)); // PC用カメラ
+    }
+    camera.position.lerp(camTarget, 0.08); 
+    camera.lookAt(playerGroup.position.clone().add(new THREE.Vector3(0, 1, -1)));
 
     for(let i=bullets.length-1;i>=0;i--) {
       const b=bullets[i]; b.mesh.position.addScaledVector(b.dir,24*dt); b.life-=dt;
@@ -620,5 +679,6 @@ animate();
 </script>
 </body>
 </html>
+
 
 ```
